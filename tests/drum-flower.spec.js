@@ -50,10 +50,12 @@ test.describe('击鼓传花游戏', () => {
     await expect(page.locator('body')).toHaveClass(/ended/);
     await expect(page.locator('#word')).toHaveText('停！');
     await expect(page.locator('#hint')).toContainText('再来一局');
-    const background = await page.evaluate(
-      () => getComputedStyle(document.body).backgroundColor,
-    );
-    expect(background).toBe('rgb(222, 41, 16)');
+    await expect
+      .poll(
+        () => page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+        { message: '结束态背景应变为国旗红' },
+      )
+      .toBe('rgb(222, 41, 16)');
 
     await page.mouse.click(195, 400);
     await expect(page.locator('body')).toHaveClass(/playing/);

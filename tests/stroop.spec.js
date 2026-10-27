@@ -35,13 +35,14 @@ test.describe('文字颜色游戏（读色挑战）', () => {
     await page.goto(PAGE);
     await page.mouse.click(195, 400);
     await expect(page.locator('#intro')).toBeHidden();
+    await page.waitForTimeout(200);
 
     let previous = null;
     for (let i = 0; i < 4; i += 1) {
       if (i > 0) {
-        await page.waitForTimeout(160);
+        await page.waitForTimeout(180);
         await page.mouse.click(195, 400);
-        await page.waitForTimeout(60);
+        await page.waitForTimeout(300);
       }
 
       const current = await page.evaluate(() => {

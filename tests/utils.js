@@ -2,11 +2,32 @@ const { expect } = require('@playwright/test');
 
 /** 断言页面没有横向滚动条（移动端适配的基本要求）。 */
 async function expectNoHorizontalScroll(page) {
-  const { scrollWidth, innerWidth } = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    innerWidth: window.innerWidth,
-  }));
-  expect(scrollWidth, '页面不应产生横向滚动').toBeLessThanOrEqual(innerWidth + 1);
+  const info = await page.evaluate(() => {
+    const wide = Array.from(document.querySelectorAll('body *'))
+      .map((el) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          tag: el.tagName.toLowerCase(),
+          id: el.id || '',
+          right: Math.round(rect.right),
+          width: Math.round(rect.width),
+        };
+      })
+      .filter((item) => item.right > window.innerWidth + 1)
+      .sort((a, b) => b.right - a.right)
+      .slice(0, 5);
+
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+      wide,
+    };
+  });
+
+  expect(
+    info.scrollWidth,
+    `页面不应产生横向滚动；溢出元素: ${JSON.stringify(info.wide)}`,
+  ).toBeLessThanOrEqual(info.innerWidth + 1);
 }
 
 /** 断言页面声明了 width=device-width 的 viewport。 */

@@ -82,7 +82,7 @@ test.describe('身份证扫描拼接工具', () => {
       page.locator('#btn-jpg').click(),
     ]);
 
-    expect(download.failure()).toBeNull();
+    expect(await download.failure()).toBeNull();
     expect(download.suggestedFilename()).toMatch(/\.jpg$/);
     const filePath = await download.path();
     expect(fs.statSync(filePath).size).toBeGreaterThan(1_000);
@@ -98,7 +98,7 @@ test.describe('身份证扫描拼接工具', () => {
       page.locator('#btn-pdf').click(),
     ]);
 
-    expect(download.failure()).toBeNull();
+    expect(await download.failure()).toBeNull();
     expect(download.suggestedFilename()).toMatch(/\.pdf$/);
     const filePath = await download.path();
     const buffer = fs.readFileSync(filePath);
