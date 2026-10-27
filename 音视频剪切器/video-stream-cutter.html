@@ -195,8 +195,9 @@
       </div>
     </div>
 
-    <div id="unsupportedBox" class="warnbox" hidden></div>
   </section>
+  <!-- 错误提示必须放在 #editor 之外：出错时 #editor 会被隐藏，否则提示也跟着消失 -->
+  <div id="unsupportedBox" class="warnbox" hidden></div>
 </main>
 
 <details id="logPanel">
