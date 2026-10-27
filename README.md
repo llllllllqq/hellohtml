@@ -42,14 +42,17 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-- 目前测试覆盖 `21点游戏` 两个页面的主流程和边界（爆牌、平局、黑杰克、庄家爆牌、余额不足、连续开新局），之后每个文件夹可以继续补充
+- 测试覆盖 `21点游戏`、`击鼓传花游戏`、`文字颜色游戏`、`生日老虎机游戏`、`身份证拼接器`（`音视频剪切器` 暂不在 CI 范围内）
+- 每个页面都会在三种环境下各跑一遍：桌面 Chrome、Pixel 5（Android Chrome）、iPhone 13（iOS Safari）
+- 移动端用例会额外检查 viewport 声明与横向滚动，确保小屏不出现横向溢出
+- `21点游戏` 还覆盖了边界：爆牌、平局、黑杰克、庄家爆牌、余额不足、连续开新局
 - 运行记录、Playwright 报告和发布记录见 [Actions](https://github.com/llllllllqq/hellohtml/actions) 与 [Releases](https://github.com/llllllllqq/hellohtml/releases)
 
 需要在本地运行时：
 
 ```bash
 npm ci
-npx playwright install chromium
+npx playwright install chromium webkit
 npm test
 ```
 
