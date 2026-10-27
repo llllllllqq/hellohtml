@@ -1,17 +1,82 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 
-const SEED = 1;
 const PAGE_21 = encodeURI('/21点游戏/21.html');
 const PAGE_21PLUS = encodeURI('/21点游戏/21plus.html');
 
 /**
- * 用固定种子替换 Math.random，让洗牌和发牌结果可复现。
- * seed = 1 时：玩家起手 10 点、要一张后 19 点，庄家最终 18 点。
+ * 固定种子的牌局（两个版本牌序一致）：
+ * - seed 1：玩家 10 点，要牌后 19 点，庄家 18 点（赢）
+ * - seed 2：玩家 16 点，庄家补到 25 点（庄家爆牌）
+ * - seed 3：玩家 13 点，要牌后 23 点（爆牌）
+ * - seed 15：玩家 20 点，庄家 20 点（平局）
+ * - seed 20：玩家 10 点，要牌后 19 点，庄家 18 点；第二局起手 12 点（连局）
+ * - seed 62：玩家起手 21 点，庄家 19 点（黑杰克）
  */
-async function freezeRandom(page) {
-  await page.addInitScript((seed) => {
-    let a = seed;
+const SEEDS = {
+  win: 1,
+  dealerBust: 2,
+  bust: 3,
+  push: 15,
+  replay: 20,
+  blackjack: 62,
+};
+
+const VARIANTS = [
+  {
+    name: '普通版 21.html',
+    url: PAGE_21,
+    selectors: {
+      bet: '#bet-amount',
+      start: '#btn-start-test',
+      hit: '#btn-hit',
+      stand: '#btn-stand',
+      balance: '#balance',
+      playerCards: '#player-cards span',
+      playerScore: '#player-score',
+      dealerScore: '#dealer-score',
+      message: '#msg',
+    },
+    messages: {
+      bust: '超分',
+      push: '平局',
+      dealerBust: '老师超分',
+      win: '你通过了测试',
+      lose: '测试未通过',
+      insufficient: '学分不足',
+    },
+  },
+  {
+    name: 'Plus 版 21plus.html',
+    url: PAGE_21PLUS,
+    selectors: {
+      bet: '#bet-amount',
+      start: '#btn-start-game',
+      hit: '#btn-hit',
+      stand: '#btn-stand',
+      balance: '#balance',
+      playerCards: '#player-cards .card',
+      playerScore: '#player-score',
+      dealerScore: '#dealer-score',
+      message: '#message-area',
+    },
+    messages: {
+      bust: '爆牌',
+      push: '平局',
+      dealerBust: '庄家爆牌',
+      win: '你赢了',
+      lose: '庄家赢了',
+      insufficient: '余额不足',
+    },
+  },
+];
+
+/**
+ * 用固定种子替换 Math.random，让洗牌和发牌结果可复现。
+ */
+async function freezeRandom(page, seed) {
+  await page.addInitScript((value) => {
+    let a = value;
     Math.random = () => {
       a |= 0;
       a = (a + 0x6d2b79f5) | 0;
@@ -19,7 +84,7 @@ async function freezeRandom(page) {
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-  }, SEED);
+  }, seed);
 }
 
 /** 打开页面，并收集未捕获的 JS 异常。 */
@@ -62,7 +127,7 @@ test.describe('21点游戏 · 普通版 21.html', () => {
   });
 
   test('投入学分、要牌、停牌可以完整走完一局', async ({ page }) => {
-    await freezeRandom(page);
+    await freezeRandom(page, SEEDS.win);
     const errors = await open(page, PAGE_21);
 
     await page.locator('#bet-amount').fill('10');
@@ -128,7 +193,7 @@ test.describe('21点游戏 · Plus 版 21plus.html', () => {
   });
 
   test('开始游戏、要牌、停牌并正确结算', async ({ page }) => {
-    await freezeRandom(page);
+    await freezeRandom(page, SEEDS.win);
     const errors = await open(page, PAGE_21PLUS);
 
     await page.locator('#bet-amount').fill('100');
@@ -170,3 +235,118 @@ test.describe('21点游戏 · Plus 版 21plus.html', () => {
     await expect(page.locator('#balance')).toHaveText('1000');
   });
 });
+
+for (const variant of VARIANTS) {
+  const s = variant.selectors;
+
+  test.describe(`21点游戏 · ${variant.name} · 边界`, () => {
+    test('起手 21 点自动结算并获胜', async ({ page }) => {
+      await freezeRandom(page, SEEDS.blackjack);
+      const errors = await open(page, variant.url);
+
+      await page.locator(s.bet).fill('10');
+      await page.locator(s.start).click();
+
+      await expect(page.locator(s.playerScore)).toHaveText('21');
+      await expect(page.locator(s.message)).toContainText(variant.messages.win, {
+        timeout: 10_000,
+      });
+      await expect(page.locator(s.dealerScore)).toHaveText('19');
+      await expect(page.locator(s.balance)).toHaveText('1010');
+      await expect(page.locator(s.start)).toBeEnabled();
+      await expect(page.locator(s.hit)).toBeDisabled();
+
+      expect(errors).toEqual([]);
+    });
+
+    test('要牌超过 21 点即爆牌，本局结束并扣掉下注', async ({ page }) => {
+      await freezeRandom(page, SEEDS.bust);
+      await open(page, variant.url);
+
+      await page.locator(s.bet).fill('10');
+      await page.locator(s.start).click();
+      await expect(page.locator(s.playerScore)).toHaveText('13');
+
+      await page.locator(s.hit).click();
+      await expect(page.locator(s.playerScore)).toHaveText('23');
+      await expect(page.locator(s.message)).toContainText(variant.messages.bust);
+      await expect(page.locator(s.balance)).toHaveText('990');
+      await expect(page.locator(s.start)).toBeEnabled();
+      await expect(page.locator(s.hit)).toBeDisabled();
+    });
+
+    test('与庄家点数相同则平局，退回本金', async ({ page }) => {
+      await freezeRandom(page, SEEDS.push);
+      await open(page, variant.url);
+
+      await page.locator(s.bet).fill('10');
+      await page.locator(s.start).click();
+      await expect(page.locator(s.playerScore)).toHaveText('20');
+
+      await page.locator(s.stand).click();
+      await expect(page.locator(s.message)).toContainText(variant.messages.push);
+      await expect(page.locator(s.dealerScore)).toHaveText('20');
+      await expect(page.locator(s.balance)).toHaveText('1000');
+      await expect(page.locator(s.start)).toBeEnabled();
+    });
+
+    test('庄家爆牌，玩家即使点数不高也能获胜', async ({ page }) => {
+      await freezeRandom(page, SEEDS.dealerBust);
+      await open(page, variant.url);
+
+      await page.locator(s.bet).fill('10');
+      await page.locator(s.start).click();
+      await expect(page.locator(s.playerScore)).toHaveText('16');
+
+      await page.locator(s.stand).click();
+      await expect(page.locator(s.message)).toContainText(variant.messages.dealerBust);
+      await expect(page.locator(s.dealerScore)).toHaveText('25');
+      await expect(page.locator(s.balance)).toHaveText('1010');
+    });
+
+    test('庄家点数更高则输掉下注', async ({ page }) => {
+      await freezeRandom(page, SEEDS.win);
+      await open(page, variant.url);
+
+      await page.locator(s.bet).fill('10');
+      await page.locator(s.start).click();
+      await expect(page.locator(s.playerScore)).toHaveText('10');
+
+      await page.locator(s.stand).click();
+      await expect(page.locator(s.message)).toContainText(variant.messages.lose);
+      await expect(page.locator(s.dealerScore)).toHaveText('21');
+      await expect(page.locator(s.balance)).toHaveText('990');
+      await expect(page.locator(s.start)).toBeEnabled();
+    });
+
+    test('下注超过余额时拒绝开局', async ({ page }) => {
+      await open(page, variant.url);
+
+      await page.locator(s.bet).fill('2000');
+      await page.locator(s.start).click();
+
+      await expect(page.locator(s.message)).toContainText(variant.messages.insufficient);
+      await expect(page.locator(s.playerCards)).toHaveCount(0);
+      await expect(page.locator(s.balance)).toHaveText('1000');
+      await expect(page.locator(s.start)).toBeEnabled();
+    });
+
+    test('一局结束后可以再来一局，余额继续累计', async ({ page }) => {
+      await freezeRandom(page, SEEDS.replay);
+      await open(page, variant.url);
+
+      await page.locator(s.bet).fill('10');
+      await page.locator(s.start).click();
+      await page.locator(s.hit).click();
+      await page.locator(s.stand).click();
+      await expect(page.locator(s.balance)).toHaveText('1010');
+      await expect(page.locator(s.start)).toBeEnabled();
+
+      await page.locator(s.start).click();
+      await expect(page.locator(s.balance)).toHaveText('1000');
+      await expect(page.locator(s.playerCards)).toHaveCount(2);
+      await expect(page.locator(s.start)).toBeDisabled();
+      await expect(page.locator(s.hit)).toBeEnabled();
+    });
+  });
+}

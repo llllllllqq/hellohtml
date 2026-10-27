@@ -25,13 +25,25 @@
 2. 所有页面均为纯前端实现，数据在本地处理，通常无需联网
 3. 建议使用较新版本的 Chrome / Edge / Firefox / Safari
 
-## ✅ 测试（CI）
+## ✅ 测试与发布（CI/CD）
 
-项目使用 [Playwright](https://playwright.dev/) 在 GitHub Actions 云端验证页面逻辑，不需要在本地安装浏览器：
+项目使用 [Playwright](https://playwright.dev/) 在 GitHub Actions 云端验证页面逻辑，不需要在本地安装浏览器。
 
-- 推送 `main`、Pull Request、手动触发，以及**发布 Release** 时都会自动跑一遍
-- 目前测试覆盖 `21点游戏` 下的两个页面，之后每个文件夹可以继续补充
-- 运行记录和 Playwright 报告见 [Actions](https://github.com/llllllllqq/hellohtml/actions)
+**CI**：推送 `main`、Pull Request、手动触发，以及手动发布 Release 时，都会在云端跑一遍测试。
+
+**CD（发版）**：推送 `v*` 标签后自动执行：
+
+1. 在云端运行 Playwright 测试（不通过就停在这里，不会发版）
+2. 把源码打包成 `hellohtml-<tag>.zip`
+3. 创建 GitHub Release，附上自动生成的 release notes 和 zip 包
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+- 目前测试覆盖 `21点游戏` 两个页面的主流程和边界（爆牌、平局、黑杰克、庄家爆牌、余额不足、连续开新局），之后每个文件夹可以继续补充
+- 运行记录、Playwright 报告和发布记录见 [Actions](https://github.com/llllllllqq/hellohtml/actions) 与 [Releases](https://github.com/llllllllqq/hellohtml/releases)
 
 需要在本地运行时：
 
