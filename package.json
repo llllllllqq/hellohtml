@@ -1,0 +1,17 @@
+{
+  "name": "hellohtml",
+  "version": "1.0.0",
+  "private": true,
+  "description": "聚合各类创意 HTML 文件的项目，使用 Playwright 在 GitHub Actions 上做云端验证",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
