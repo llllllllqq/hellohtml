@@ -1,5 +1,9 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const {
+  expectNoHorizontalScroll,
+  expectResponsiveViewport,
+} = require('./utils');
 
 const PAGE_21 = encodeURI('/21点游戏/21.html');
 const PAGE_21PLUS = encodeURI('/21点游戏/21plus.html');
@@ -350,3 +354,34 @@ for (const variant of VARIANTS) {
     });
   });
 }
+
+// 上面所有用例都会在 desktop-chromium / mobile-chrome / mobile-safari
+// 三个 project 里各跑一遍；下面再补一组只在移动端执行的触控与布局检查。
+test.describe('21点游戏 · 移动端兼容性', () => {
+  for (const variant of VARIANTS) {
+    const s = variant.selectors;
+
+    test(`${variant.name}：窄屏无横向溢出，可触控开始`, async ({ page, isMobile }) => {
+      test.skip(!isMobile, '仅在移动端 project 运行');
+      await freezeRandom(page, SEEDS.win);
+      await open(page, variant.url);
+
+      await expectResponsiveViewport(page);
+      await expectNoHorizontalScroll(page);
+
+      const viewport = page.viewportSize();
+      const startBox = await page.locator(s.start).boundingBox();
+      expect(viewport).not.toBeNull();
+      expect(startBox).not.toBeNull();
+      expect(startBox.x).toBeGreaterThanOrEqual(-1);
+      expect(startBox.x + startBox.width).toBeLessThanOrEqual(viewport.width + 1);
+
+      await page.locator(s.bet).fill('10');
+      await page.locator(s.start).tap();
+
+      await expect(page.locator(s.playerCards)).toHaveCount(2);
+      await expect(page.locator(s.hit)).toBeEnabled();
+      await expect(page.locator(s.balance)).toHaveText('990');
+    });
+  }
+});
