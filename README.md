@@ -29,7 +29,7 @@
 
 项目使用 [Playwright](https://playwright.dev/) 在 GitHub Actions 云端验证页面逻辑，不需要在本地安装浏览器：
 
-- 推送 `main`、Pull Request、推送 `v*` 标签、手动触发，以及**发布 Release** 时都会自动跑一遍
+- 推送 `main`、Pull Request、手动触发，以及**发布 Release** 时都会自动跑一遍
 - 目前测试覆盖 `21点游戏` 下的两个页面，之后每个文件夹可以继续补充
 - 运行记录和 Playwright 报告见 [Actions](https://github.com/llllllllqq/hellohtml/actions)
 
