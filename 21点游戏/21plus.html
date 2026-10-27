@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>强化自适应 21 点 (Blackjack)</title>
+    <style>
+        :root {
+            --table-color: #2d5e3e;
+            --card-width: 55px;
+            --card-height: 77px;
+            --text-color: #ffffff;
+            --border-radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--table-color);
+            color: var(--text-color);
+            padding: 8px;
+            min-height: 100vh;
+            user-select: none;
+            overflow-x: hidden; /* 关键：隐藏水平滚动条 */
+        }
+
+        h1 {
+            margin: 10px 0;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            font-size: 1.4rem;
+        }
+
+        /* 游戏区域布局 */
+        .game-area {
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .hand-section {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: var(--border-radius);
+            padding: 10px;
+            min-height: 130px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .score-display {
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 6px;
+            background: rgba(0,0,0,0.4);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        .cards-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: nowrap; /* 关键：防止卡片换行 */
+            gap: 4px;
+            width: 100%;
+            overflow-x: auto; /* 允许卡片区域横向滚动 */
+            padding: 5px;
+            scrollbar-width: none; /* Firefox 隐藏滚动条 */
+        }
+        .cards-container::-webkit-scrollbar { /* Chrome/Safari 隐藏滚动条 */
+            display: none;
+        }
+
+        /* 扑克牌样式 (纯 CSS 绘制) */
+        .card {
+            width: var(--card-width);
+            height: var(--card-height);
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 3px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            position: relative;
+            animation: dealCard 0.3s ease-out;
+            color: black;
+            flex-shrink: 0; /* 关键：防止卡片被压缩 */
+        }
+
+        @keyframes dealCard {
+            from { transform: translateY(-50px) scale(0.8); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        .card.red { color: #d40000; }
+        .card.black { color: #222; }
+
+        .card-top { align-self: flex-start; line-height: 1; font-size: 0.7rem; }
+        .card-center { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 1.1rem; 
+        }
+        .card-bottom { align-self: flex-end; transform: rotate(180deg); line-height: 1; font-size: 0.7rem; }
+
+        /* 背面牌样式 */
+        .card.back {
+            background: repeating-linear-gradient(
+                45deg,
+                #606dbc,
+                #606dbc 10px,
+                #465298 10px,
+                #465298 20px
+            );
+            border: 2px solid white;
+        }
+        .card.back * { display: none; }
+
+        /* 控制按钮区域 */
+        .controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+
+        button {
+            padding: 9px 15px;
+            font-size: 0.85rem;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.2s;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            flex: 1;
+            min-width: 90px;
+            max-width: 140px;
+        }
+
+        button:active { transform: scale(0.95); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        .btn-hit { background-color: #4CAF50; color: white; }
+        .btn-stand { background-color: #f44336; color: white; }
+        .btn-new { background-color: #2196F3; color: white; }
+        .btn-bet { background-color: #FF9800; color: white; }
+
+        /* 消息提示 */
+        #message-area {
+            height: 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 1px 1px 2px black;
+            margin: 10px 0;
+        }
+
+        .win { color: #4CAF50; }
+        .lose { color: #f44336; }
+        .draw { color: #FFC107; }
+
+        /* 赌注系统样式 */
+        .bet-area {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: var(--border-radius);
+            padding: 10px;
+            width: 100%;
+            margin: 8px auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .balance-display {
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 6px;
+            background: rgba(0,0,0,0.4);
+            padding: 5px 14px;
+            border-radius: 20px;
+        }
+
+        .bet-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .bet-input {
+            padding: 7px 10px;
+            font-size: 0.95rem;
+            border-radius: 5px;
+            border: 2px solid #2196F3;
+            width: 90px;
+            text-align: center;
+            max-width: 110px;
+        }
+
+        .current-bet {
+            font-size: 0.9rem;
+            font-weight: bold;
+            background: rgba(0,0,0,0.4);
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+
+        .start-game-btn-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-top: 5px;
+        }
+
+        /* 桌面端适配 */
+        @media (min-width: 600px) {
+            :root {
+                --card-width: 80px;
+                --card-height: 112px;
+                --border-radius: 15px;
+            }
+            .card-center { font-size: 2rem; }
+            .card-top, .card-bottom { font-size: 1.2rem; }
+            h1 { font-size: 2rem; }
+            .score-display { font-size: 1.2rem; }
+            .controls { gap: 12px; }
+            button {
+                padding: 12px 24px;
+                font-size: 1rem;
+                min-width: 120px;
+                max-width: 180px;
+            }
+            .bet-controls {
+                flex-direction: row;
+                gap: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>♠️ 21 点 Blackjack ♥️</h1>
+
+    <div class="bet-area">
+        <div class="balance-display">余额: <span id="balance">1000</span></div>
+        <div class="bet-controls">
+            <div>
+                <label for="bet-amount">下注:</label>
+                <input type="number" id="bet-amount" class="bet-input" min="1" max="1000" value="10">
+            </div>
+            <div class="start-game-btn-container">
+                <button id="btn-start-game" class="btn-bet" onclick="startNewGame()">开始游戏</button>
+            </div>
+            <div class="current-bet">当前赌注: <span id="current-bet">0</span></div>
+        </div>
+    </div>
+
+    <div id="message-area"></div>
+
+    <div class="game-area">
+        <!-- 庄家区域 -->
+        <div class="hand-section">
+            <div class="score-display">庄家：<span id="dealer-score">0</span></div>
+            <div class="cards-container" id="dealer-cards">
+                <!-- 卡牌将在这里生成 -->
+            </div>
+        </div>
+
+        <!-- 玩家区域 -->
+        <div class="hand-section">
+            <div class="score-display">玩家：<span id="player-score">0</span></div>
+            <div class="cards-container" id="player-cards">
+                <!-- 卡牌将在这里生成 -->
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="btn-hit" class="btn-hit" onclick="hit()" disabled>要牌 (Hit)</button>
+        <button id="btn-stand" class="btn-stand" onclick="stand()" disabled>停牌 (Stand)</button>
+    </div>
+
+    <script>
+        // --- 游戏数据与状态 ---
+        const suits = ['♠', '♥', '♣', '♦'];
+        const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        
+        let deck = [];
+        let playerHand = [];
+        let dealerHand = [];
+        let gameOver = false;
+        let balance = 1000;
+        let currentBet = 0;
+        let gameActive = false;
+        let isProcessing = false; // 防止重复点击
+
+        // --- 核心逻辑函数 ---
+
+        // 创建一副新牌
+        function createDeck() {
+            let newDeck = [];
+            for (let suit of suits) {
+                for (let value of values) {
+                    let weight = parseInt(value);
+                    if (value === 'J' || value === 'Q' || value === 'K') weight = 10;
+                    if (value === 'A') weight = 11;
+                    newDeck.push({ value, suit, weight });
+                }
+            }
+            return newDeck;
+        }
+
+        // 洗牌 (Fisher-Yates 算法)
+        function shuffleDeck(deckToShuffle) {
+            for (let i = deckToShuffle.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deckToShuffle[i], deckToShuffle[j]] = [deckToShuffle[j], deckToShuffle[i]];
+            }
+            return deckToShuffle;
+        }
+
+        // 发一张牌
+        function dealCard() {
+            return deck.pop();
+        }
+
+        // 计算手牌点数 (处理 A 的逻辑)
+        function calculateScore(hand) {
+            let score = 0;
+            let aceCount = 0;
+
+            for (let card of hand) {
+                score += card.weight;
+                if (card.value === 'A') aceCount++;
+            }
+
+            // 如果爆牌且有 A，将 A 从 11 变为 1
+            while (score > 21 && aceCount > 0) {
+                score -= 10;
+                aceCount--;
+            }
+            return score;
+        }
+
+        // --- 界面渲染函数 ---
+
+        function renderCard(card, isHidden = false) {
+            const div = document.createElement('div');
+            div.className = 'card';
+            
+            if (isHidden) {
+                div.classList.add('back');
+                return div;
+            }
+
+            // 设置颜色
+            if (card.suit === '♥' || card.suit === '♦') {
+                div.classList.add('red');
+            } else {
+                div.classList.add('black');
+            }
+
+            // 内部结构
+            div.innerHTML = `
+                <div class="card-top">${card.value}${card.suit}</div>
+                <div class="card-center">${card.suit}</div>
+                <div class="card-bottom">${card.value}${card.suit}</div>
+            `;
+            return div;
+        }
+
+        function updateUI(showDealerHidden = false) {
+            const playerContainer = document.getElementById('player-cards');
+            const dealerContainer = document.getElementById('dealer-cards');
+            const playerScoreEl = document.getElementById('player-score');
+            const dealerScoreEl = document.getElementById('dealer-score');
+
+            // 清空当前显示
+            playerContainer.innerHTML = '';
+            dealerContainer.innerHTML = '';
+
+            // 渲染玩家手牌
+            playerHand.forEach(card => {
+                playerContainer.appendChild(renderCard(card));
+            });
+            playerScoreEl.innerText = calculateScore(playerHand);
+
+            // 渲染庄家手牌
+            dealerHand.forEach((card, index) => {
+                // 如果游戏未结束且是第一张牌，则显示背面
+                if (index === 0 && !showDealerHidden && !gameOver) {
+                    dealerContainer.appendChild(renderCard(card, true));
+                } else {
+                    dealerContainer.appendChild(renderCard(card));
+                }
+            });
+
+            // 计算庄家显示分数
+            if (gameOver || showDealerHidden) {
+                dealerScoreEl.innerText = calculateScore(dealerHand);
+            } else {
+                // 只计算第二张牌及以后的分数（第一张是暗牌）
+                dealerScoreEl.innerText = "?"; 
+            }
+        }
+
+        function showMessage(msg, type) {
+            const el = document.getElementById('message-area');
+            el.innerText = msg;
+            el.className = type || ""; // win, lose, draw
+        }
+
+        function updateBalance() {
+            document.getElementById('balance').innerText = balance;
+        }
+
+        function updateCurrentBet() {
+            document.getElementById('current-bet').innerText = currentBet;
+        }
+
+        function toggleButtons(isPlaying) {
+            document.getElementById('btn-hit').disabled = !isPlaying;
+            document.getElementById('btn-stand').disabled = !isPlaying;
+            document.getElementById('btn-start-game').disabled = isPlaying;
+        }
+
+        // --- 游戏流程控制 ---
+
+        function startNewGame() {
+            // 防止重复点击
+            if (isProcessing || gameActive) return;
+            isProcessing = true;
+            
+            // 清除消息
+            showMessage("", "");
+            
+            const betInput = document.getElementById('bet-amount');
+            const amount = parseInt(betInput.value);
+            
+            if (isNaN(amount) || amount <= 0) {
+                showMessage("请输入有效下注金额", "");
+                isProcessing = false;
+                return;
+            }
+            
+            if (amount > balance) {
+                showMessage("余额不足", "");
+                isProcessing = false;
+                return;
+            }
+            
+            currentBet = amount;
+            balance -= amount;
+            updateBalance();
+            updateCurrentBet();
+            
+            // 开始游戏
+            initGame();
+        }
+
+        function initGame() {
+            gameOver = false;
+            gameActive = true;
+            
+            // 重新洗牌
+            deck = shuffleDeck(createDeck());
+            playerHand = [dealCard(), dealCard()];
+            dealerHand = [dealCard(), dealCard()];
+            
+            toggleButtons(true);
+            updateUI(false);
+
+            // 检查初始黑杰克
+            const pScore = calculateScore(playerHand);
+            if (pScore === 21) {
+                setTimeout(() => stand(), 500); // 自动停牌结算
+            }
+            
+            isProcessing = false;
+        }
+
+        function hit() {
+            if (gameOver || isProcessing) return;
+            isProcessing = true;
+            
+            playerHand.push(dealCard());
+            updateUI(false);
+
+            const score = calculateScore(playerHand);
+            if (score > 21) {
+                // 立即更新UI，然后延迟结束游戏
+                setTimeout(() => {
+                    endGame("爆牌！你输了。", "lose");
+                    isProcessing = false;
+                }, 100);
+            } else {
+                isProcessing = false;
+            }
+        }
+
+        function stand() {
+            if (gameOver || isProcessing) return;
+            isProcessing = true;
+
+            // 延迟执行以避免UI卡顿
+            setTimeout(() => {
+                // 庄家回合：必须补牌直到点数 >= 17
+                let dealerScore = calculateScore(dealerHand);
+                while (dealerScore < 17) {
+                    dealerHand.push(dealCard());
+                    dealerScore = calculateScore(dealerHand);
+                }
+
+                updateUI(true); // 显示庄家所有牌
+                determineWinner();
+                
+                isProcessing = false;
+            }, 100);
+        }
+
+        function determineWinner() {
+            const pScore = calculateScore(playerHand);
+            const dScore = calculateScore(dealerHand);
+
+            if (dScore > 21) {
+                // 庄家爆牌，玩家获胜，赢得双倍赌注
+                balance += currentBet * 2;
+                showMessage(`庄家爆牌！你赢了 ${currentBet * 2} 元！`, "win");
+            } else if (pScore > dScore) {
+                // 玩家获胜，赢得双倍赌注
+                balance += currentBet * 2;
+                showMessage(`你赢了 ${currentBet * 2} 元！`, "win");
+            } else if (pScore < dScore) {
+                // 庄家获胜，玩家失去赌注
+                showMessage("庄家赢了。你失去了赌注。", "lose");
+            } else {
+                // 平局，返还赌注
+                balance += currentBet;
+                showMessage(`平局 (Push)。返还 ${currentBet} 元。`, "draw");
+            }
+            
+            updateBalance();
+            endGame();
+        }
+
+        function endGame(message, type) {
+            gameOver = true;
+            gameActive = false;
+            toggleButtons(false);
+            
+            // 如果提供了消息参数，显示该消息
+            if (message) {
+                showMessage(message, type);
+            }
+            
+            currentBet = 0;
+            updateCurrentBet();
+        }
+
+        // 启动游戏
+        updateBalance();
+        updateCurrentBet();
+    </script>
+</body>
+</html>

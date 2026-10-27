@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>击鼓传花</title>
+<style>
+:root{
+  --red:#DE2910;            /* 结束信号：国旗红 */
+  --fg:#111111;             /* 大字颜色 */
+  --sw:0em;                 /* 描边宽度 */
+  --sc:#111111;             /* 描边颜色 */
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{height:100%}
+body{
+  height:100vh; height:100dvh;
+  overflow:hidden;
+  background:#fff;
+  color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  display:flex; align-items:center; justify-content:center;
+  padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 12px);
+  -webkit-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+  transition:background-color .12s ease, color .12s ease;
+}
+
+/* 中央大字 */
+#word{
+  font-size:clamp(4rem,34vmin,20rem);
+  font-weight:900; line-height:1.05; letter-spacing:.04em;
+  white-space:nowrap; text-align:center;
+  color:var(--fg);
+  -webkit-text-stroke:var(--sw) var(--sc);
+  paint-order:stroke fill;
+  transition:color .18s ease;
+}
+#word.pop{animation:pop .42s cubic-bezier(.2,.9,.3,1.25)}
+@keyframes pop{
+  0%{transform:scale(.68); opacity:0}
+  60%{transform:scale(1.06); opacity:1}
+  100%{transform:scale(1); opacity:1}
+}
+/* 击鼓时大字的随拍跳动 */
+#word.beat{animation:beat .22s ease}
+@keyframes beat{
+  0%{transform:scale(1)}
+  35%{transform:scale(1.16)}
+  100%{transform:scale(1)}
+}
+
+/* 提示行 */
+#hint{
+  position:fixed; left:0; right:0;
+  bottom:calc(env(safe-area-inset-bottom) + 18px);
+  text-align:center;
+  font-size:clamp(13px,3.6vw,16px); font-weight:600; letter-spacing:.04em;
+  opacity:.55;
+  pointer-events:none;
+  transition:color .12s ease;
+}
+
+/* 鼓声开关：常驻右上角，点击不触发开始 */
+#sound{
+  position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; z-index:30;
+  font-size:clamp(13px,3.6vw,15px); font-weight:700; letter-spacing:.06em;
+  padding:9px 15px; border-radius:999px;
+  background:#111; color:#fff; border:1px solid #111;
+  cursor:pointer; user-select:none;
+  transition:background-color .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
+}
+#sound.off{ background:rgba(17,17,17,.04); color:#8a8a8a; border-color:rgba(17,17,17,.22); }
+#sound:active{transform:scale(.96)}
+body.ended #sound{ background:rgba(0,0,0,.25); color:#fff; border-color:rgba(255,255,255,.55); }
+body.ended #sound.off{ background:rgba(255,255,255,.12); color:rgba(255,255,255,.78); border-color:rgba(255,255,255,.4); }
+
+/* 开场说明卡 */
+#intro{
+  position:fixed; inset:0; z-index:20;
+  background:#fff; color:#111;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:clamp(14px,3.4vh,26px);
+  padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+  text-align:center;
+  transition:opacity .35s ease;
+}
+#intro.hide{opacity:0; pointer-events:none}
+#intro h1{
+  font-size:clamp(1.5rem,8vw,2.4rem); font-weight:900; letter-spacing:.08em;
+}
+#intro h1 span{display:block; font-size:.42em; font-weight:600; opacity:.5; letter-spacing:.04em; margin-top:.5em}
+.rule{
+  font-size:clamp(13px,3.7vw,16px); line-height:1.9; opacity:.66; max-width:520px;
+}
+.rule b{font-weight:800; opacity:1; color:var(--red)}
+.flow{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  font-size:clamp(1.6rem,9vw,2.6rem); font-weight:900;
+}
+.flow .arrow{font-size:.6em; opacity:.4}
+.flow .stop{color:var(--red)}
+.start{
+  font-size:clamp(14px,3.8vw,17px); font-weight:700;
+  padding:13px 30px; border-radius:999px; color:#fff; background:#111;
+  animation:breathe 1.8s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+
+/* 状态配色 */
+body.playing #word{ color:var(--fg); }
+body.ended{ background:var(--red); color:#fff; }
+body.ended #word{ color:#fff; }
+body.ended #hint{ color:#fff; opacity:.85; }
+</style>
+</head>
+<body>
+
+<div id="word">击鼓传花</div>
+<div id="hint">点击任意处开始</div>
+
+<button id="sound" type="button">鼓声 开</button>
+
+<div id="intro">
+  <h1>击鼓传花<span>DRUM &amp; FLOWER</span></h1>
+  <div class="flow">
+    <span>咚</span><span class="arrow">→</span><span>传</span><span class="arrow">→</span><span class="stop">停！</span>
+  </div>
+  <p class="rule">点击屏幕开始击鼓，鼓声会<b>随机停止</b>。<br>当整屏<b>变红</b>的那一刻，正拿着花的人就输啦！<br>鼓声可随时在右上角开关。</p>
+  <div class="start">点击任意处开始</div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var el = {
+    body:  document.body,
+    word:  document.getElementById('word'),
+    hint:  document.getElementById('hint'),
+    intro: document.getElementById('intro'),
+    sound: document.getElementById('sound')
+  };
+
+  var state = 'intro';     // intro | playing | ended
+  var soundOn = true;
+  var locked = false;
+  var beatTimer = null, stopTimer = null;
+
+  /* ---------- 鼓声：用 WebAudio 现场合成，零外部文件 ---------- */
+  var actx = null;
+  function ensureAudio(){
+    if(!actx){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(AC) actx = new AC();
+    }
+    if(actx && actx.state === 'suspended') actx.resume();
+  }
+  function playDrum(){
+    if(!soundOn) return;
+    ensureAudio();
+    if(!actx) return;
+    var t = actx.currentTime;
+
+    // 低频「咚」：正弦音从高到低压下来，快速衰减
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(190, t);
+    o.frequency.exponentialRampToValueAtTime(55, t + 0.18);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.7, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + 0.32);
+
+    // 鼓皮「啪」：一小段带包络的白噪声
+    var dur = 0.07, len = Math.floor(actx.sampleRate * dur);
+    var buf = actx.createBuffer(1, len, actx.sampleRate);
+    var d = buf.getChannelData(0);
+    for(var i=0;i<len;i++){ d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2); }
+    var n = actx.createBufferSource(); n.buffer = buf;
+    var ng = actx.createGain(); ng.gain.value = 0.28;
+    n.connect(ng).connect(actx.destination); n.start(t);
+  }
+
+  /* ---------- 节拍与随机停止 ---------- */
+  function onBeat(){
+    playDrum();
+    el.word.classList.remove('beat');
+    void el.word.offsetWidth;          // 重启动画
+    el.word.classList.add('beat');
+  }
+  function clearTimers(){
+    if(beatTimer){ clearInterval(beatTimer); beatTimer = null; }
+    if(stopTimer){ clearTimeout(stopTimer);  stopTimer = null; }
+  }
+  function start(){
+    state = 'playing';
+    el.intro.classList.add('hide');
+    setTimeout(function(){ el.intro.style.display = 'none'; }, 360);
+
+    el.body.classList.remove('ended');
+    el.body.classList.add('playing');
+    el.word.classList.remove('pop','beat');
+    void el.word.offsetWidth;
+    el.word.textContent = '咚';
+    el.hint.textContent = '传花中… 鼓声随时会停';
+    el.hint.style.color = '';
+
+    ensureAudio();
+    clearTimers();
+    var dur = 3000 + Math.random() * 7000;   // 3~10 秒随机
+    onBeat();
+    beatTimer = setInterval(onBeat, 480);     // 约每拍一次
+    stopTimer = setTimeout(stop, dur);
+  }
+  function stop(){
+    clearTimers();
+    state = 'ended';
+    el.body.classList.remove('playing');
+    el.body.classList.add('ended');
+    el.word.classList.remove('beat','pop');
+    void el.word.offsetWidth;
+    el.word.textContent = '停！';
+    el.word.classList.add('pop');
+    el.hint.textContent = '点击任意处再来一局';
+    if(navigator.vibrate) navigator.vibrate([180, 70, 180]);  // 震动提示（支持的设备）
+  }
+
+  /* ---------- 鼓声开关 ---------- */
+  function updateSound(){
+    el.sound.textContent = soundOn ? '鼓声 开' : '鼓声 关';
+    el.sound.classList.toggle('off', !soundOn);
+    el.sound.setAttribute('aria-pressed', String(soundOn));
+  }
+  el.sound.addEventListener('pointerdown', function(e){
+    e.stopPropagation();            // 别让 pointerdown 冒泡到 document 误触发开始
+  });
+  el.sound.addEventListener('click', function(e){
+    e.stopPropagation();            // 别误触发开始
+    soundOn = !soundOn;
+    updateSound();
+    if(soundOn) playDrum();         // 开的时候给个反馈
+  });
+
+  /* ---------- 主交互：点击任意处开始 / 再来 ---------- */
+  function tap(){
+    if(locked) return;
+    locked = true;
+    setTimeout(function(){ locked = false; }, 120);   // 防手抖连触
+    if(state === 'intro' || state === 'ended') start();
+    // 击鼓进行中（playing）忽略点击，让鼓声自己随机停
+  }
+  document.addEventListener('pointerdown', tap, {passive:true});
+  document.addEventListener('keydown', function(e){
+    if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); tap(); }
+  });
+  if(!window.PointerEvent){
+    document.addEventListener('touchstart', tap, {passive:true});
+  }
+
+  updateSound();
+})();
+</script>
+</body>
+</html>

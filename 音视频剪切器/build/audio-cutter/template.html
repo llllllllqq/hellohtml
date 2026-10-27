@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>音频无损剪切器 · Stream Copy Cutter</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --panel:#ffffff; --panel2:#eef2f8; --line:#d9e0ea;
+    --txt:#1b2434; --dim:#5b6577; --acc:#1f6feb; --acc2:#d97706; --ok:#0a9d6e; --err:#e5484d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--txt);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    min-height:100vh;
+  }
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+  header{
+    padding:22px 28px 18px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#ffffff,#f4f6fa);
+  }
+  header h1{margin:0;font-size:20px;letter-spacing:.5px}
+  header h1 .en{font-size:13px;color:var(--dim);font-weight:400;margin-left:10px}
+  .badges{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+  .badge{
+    font-size:12px;padding:2px 10px;border-radius:20px;border:1px solid var(--line);
+    background:var(--panel);color:var(--dim);
+  }
+  .badge b{color:var(--ok);font-weight:700}
+  header p.sub{margin:10px 0 0;color:var(--dim);font-size:13px}
+  header p.sub code{color:#b45309;background:#fdf1dc;padding:1px 6px;border-radius:4px}
+  main{max-width:1080px;margin:0 auto;padding:22px 20px 40px}
+
+  /* ---- 拖放区 ---- */
+  #dropZone{
+    border:2px dashed #c3cede; border-radius:14px; background:var(--panel);
+    padding:46px 20px; text-align:center; transition:.15s; cursor:pointer;
+  }
+  #dropZone:hover,#dropZone.over{border-color:var(--acc);background:#eef4ff}
+  #dropZone .icon{font-size:40px;margin-bottom:8px}
+  #dropZone p{margin:6px 0}
+  #dropZone .hint{color:var(--dim);font-size:12.5px;max-width:680px;margin:10px auto 0}
+  button,.btn{
+    font:inherit;color:var(--txt);background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:7px 14px;cursor:pointer;transition:.12s;
+  }
+  button:hover{border-color:var(--acc);color:var(--acc);background:#f5f9ff}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary,#cutBtn{
+    background:linear-gradient(180deg,#3b82f6,#1f6feb);border-color:#1f6feb;color:#fff;font-weight:600;
+  }
+  button.primary:hover{filter:brightness(1.08);color:#fff;background:linear-gradient(180deg,#3b82f6,#1f6feb)}
+  a.primary{
+    display:inline-block;text-decoration:none;background:linear-gradient(180deg,#14b981,#0a9d6e);
+    border-color:#0a9d6e;color:#fff;font-weight:700;border-radius:8px;padding:8px 18px;
+  }
+
+  /* ---- 编辑器 ---- */
+  .layout{display:grid;grid-template-columns:1fr 300px;gap:16px;margin-top:18px}
+  @media (max-width:860px){.layout{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 1px 3px #1b24340d}
+  .card h3{margin:0 0 10px;font-size:13px;color:var(--dim);font-weight:600;letter-spacing:1px}
+  audio{width:100%;display:block;border-radius:8px}
+  .playbar{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .playbar label{color:var(--dim);font-size:12.5px;display:flex;gap:5px;align-items:center;cursor:pointer}
+  .playbar input[type=checkbox]{accent-color:var(--acc)}
+  #infoList,#resList{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
+  #infoList dt,#resList dt{color:var(--dim)}
+  #infoList dd,#resList dd{margin:0;text-align:right;word-break:break-all}
+
+  /* ---- 时间线 ---- */
+  .tl-wrap{margin-top:16px}
+  #tl{
+    width:100%;height:86px;display:block;border-radius:10px;background:#ffffff;
+    border:1px solid var(--line);cursor:pointer;touch-action:none;
+  }
+  .tl-scale{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-top:4px}
+
+  .time-inputs{display:flex;gap:14px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .time-inputs label{color:var(--dim);display:flex;align-items:center;gap:8px}
+  .time-inputs input{
+    font:inherit;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;
+    background:#ffffff;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 10px;width:130px;
+  }
+  .time-inputs input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px #1f6feb1f}
+  .fmt-hint{color:var(--dim);font-size:12px}
+  .snap-note{color:#b45309;font-size:12.5px;margin:10px 0 0;min-height:20px}
+
+  .actions{display:flex;gap:14px;align-items:center;margin-top:18px;flex-wrap:wrap}
+  #cutBtn{padding:10px 22px;font-size:15px}
+  .progress{flex:1;min-width:200px;display:none;align-items:center;gap:10px}
+  .progress.on{display:flex}
+  .progress .track{flex:1;height:8px;background:#e6ebf3;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  .progress .bar{height:100%;width:0;background:linear-gradient(90deg,#1f6feb,#0a9d6e);transition:width .2s}
+  .progress span{font-size:12.5px;color:var(--dim);white-space:nowrap}
+
+  #result{margin-top:18px;border-color:#a9dfc9}
+  #result h3{color:var(--ok)}
+  .res-actions{display:flex;gap:10px;margin:12px 0;align-items:center;flex-wrap:wrap}
+  .ffcmd{margin-top:8px;background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .ffcmd p{margin:0 0 6px;color:var(--dim);font-size:12px}
+  .ffcmd code{color:#b45309;font-size:12.5px;word-break:break-all}
+  .warnbox{
+    margin-top:14px;background:#fff8e8;border:1px solid #f2d9a8;color:#7a4a05;
+    border-radius:10px;padding:12px 14px;font-size:13px;
+  }
+  .warnbox b{color:#b45309}
+
+  #logPanel{margin:26px auto 0;max-width:1080px;padding:0 20px}
+  #logPanel summary{cursor:pointer;color:var(--dim);font-size:13px}
+  #log{
+    background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+    font-size:12px;color:#4a5468;max-height:220px;overflow:auto;white-space:pre-wrap;margin-top:8px;
+  }
+  footer{max-width:1080px;margin:0 auto;padding:0 20px 40px;color:var(--dim);font-size:12.5px}
+  footer ul{margin:8px 0 0;padding-left:20px}
+  footer li{margin:3px 0}
+  .kbd{background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;font-size:11.5px}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>音频无损剪切器 <span class="en">Stream Copy Cutter</span></h1>
+  <div class="badges">
+    <span class="badge"><b>●</b> 纯前端单文件</span>
+    <span class="badge"><b>●</b> 完全离线 · 文件不上传</span>
+    <span class="badge"><b>●</b> 不重新编码</span>
+    <span class="badge"><b>●</b> 不依赖 ffmpeg / 任何外部库</span>
+  </div>
+  <p class="sub">选择音频文件 → 在时间线上选段 → 直接输出原始码流，效果等同于 <code>ffmpeg -ss 起点 -to 终点 -i 输入 -c copy 输出</code>，秒级完成。</p>
+</header>
+
+<main>
+  <section id="dropZone">
+    <input type="file" id="fileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.oga,.opus" hidden>
+    <div class="icon">🎵</div>
+    <p>把音频文件拖到这里，或 <button id="pickBtn" type="button">选择文件</button></p>
+    <p class="hint">支持 <b>WAV</b>（PCM/浮点）、<b>MP3</b>（CBR/VBR，含 ID3）、<b>M4A / MP4 音频</b>（AAC / ALAC / Opus）、<b>FLAC</b>、<b>OGG</b>（Vorbis / Opus）五种容器。
+    切割点自动吸附到帧/页边界，输出文件保留原始编码与音质。文件仅在本地内存中处理，不会发送到任何服务器。</p>
+  </section>
+
+  <section id="editor" hidden>
+    <div class="layout">
+      <div class="card">
+        <audio id="audio" controls playsinline preload="metadata"></audio>
+        <div class="playbar">
+          <button id="btnSetStart" type="button" title="快捷键 I">⇤ 设为起点 (I)</button>
+          <button id="btnSetEnd" type="button" title="快捷键 O">设为终点 (O) ⇥</button>
+          <button id="btnPlaySel" type="button" title="快捷键 P">▶ 预览片段 (P)</button>
+          <label><input type="checkbox" id="loopChk" checked> 循环预览</label>
+        </div>
+      </div>
+      <aside class="card">
+        <h3>文件信息</h3>
+        <dl id="infoList"></dl>
+      </aside>
+    </div>
+
+    <div class="tl-wrap">
+      <canvas id="tl"></canvas>
+      <div class="tl-scale"><span>00:00.000</span><span id="durLabel"></span></div>
+    </div>
+
+    <div class="time-inputs">
+      <label>开始 <input id="inTime" class="mono" value="00:00.000" spellcheck="false"></label>
+      <label>结束 <input id="outTime" class="mono" value="00:00.000" spellcheck="false"></label>
+      <span class="fmt-hint">可填 69 ｜ 01:09（分:秒）｜ 00:01:09（时:分:秒）</span>
+    </div>
+    <p class="snap-note" id="snapNote"></p>
+
+    <div class="actions">
+      <button id="cutBtn" class="primary" type="button">✂ 开始剪切（无损）</button>
+      <div class="progress" id="progWrap"><div class="track"><div class="bar" id="progBar"></div></div><span id="progText"></span></div>
+    </div>
+
+    <div id="result" class="card" hidden>
+      <h3>✓ 剪切完成</h3>
+      <dl id="resList"></dl>
+      <div class="res-actions">
+        <a id="dlBtn" class="primary" download>⬇ 下载音频</a>
+        <button id="againBtn" type="button">调整区间重新剪切</button>
+        <span id="playCheck" style="color:var(--dim);font-size:12.5px"></span>
+      </div>
+      <div class="ffcmd">
+        <p>等价的 ffmpeg 命令（供参考）：</p>
+        <code id="ffCmd"></code>
+      </div>
+    </div>
+
+    <div id="unsupportedBox" class="warnbox" hidden></div>
+  </section>
+</main>
+
+<details id="logPanel">
+  <summary>运行日志</summary>
+  <pre id="log"></pre>
+</details>
+
+<footer>
+  <b>各格式切割精度说明</b>
+  <ul>
+    <li><b>WAV</b>：样本级精确切割，按块对齐，起点终点完全等于所选时间。</li>
+    <li><b>MP3</b>：帧边界切割（约 26ms@44.1kHz / 46ms@48kHz）。起点前 1～2 帧因 MP3 比特库（bit reservoir）依赖可能有极轻微杂音，属该格式物理特性，ffmpeg <code>-c copy</code> 同样存在。</li>
+    <li><b>M4A / MP4 音频</b>：按 AAC/ALAC 采样表样本级切割（AAC 约 21ms@48kHz 粒度），保留 esds / alac / dOps 配置盒原样。</li>
+    <li><b>FLAC</b>：帧边界切割（块大小通常 4096 样本，约 93ms@44.1kHz）；会重写 STREAMINFO 样本总数并将 MD5 校验置零（不重算，播放器自动忽略）。</li>
+    <li><b>OGG（Vorbis / Opus）</b>：页边界切割（Opus 约 20ms/帧，Vorbis 一页可含多帧）；保留 Vorbis/Opus 标识与注释头，重写页序号与 CRC32。</li>
+    <li>快捷键：<span class="kbd">空格</span> 播放/暂停 · <span class="kbd">I</span> 设起点 · <span class="kbd">O</span> 设终点 · <span class="kbd">P</span> 预览片段 · 紫色虚线为实际切割点。</li>
+  </ul>
+</footer>
+
+<script>
+'use strict';
+/*__APP__*/
+</script>
+</body>
+</html>

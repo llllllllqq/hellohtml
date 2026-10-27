@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🎰 生日老虎机 · 祝你生日快乐</title>
+<style>
+  :root{
+    --pink:#ff8fb1;
+    --pink-deep:#ff5f8d;
+    --purple:#a78bfa;
+    --purple-deep:#7c5cf0;
+    --gold:#ffd166;
+    --gold-deep:#f0a500;
+    --cream:#fff7ec;
+    --ink:#4a3355;
+    --itemh:5.2rem;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{font-size:clamp(14px,3.7vw,18px);}
+  body{
+    margin:0;min-height:100vh;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 15% 12%, #ffe3f0 0%, transparent 45%),
+      radial-gradient(circle at 85% 20%, #e6e0ff 0%, transparent 45%),
+      radial-gradient(circle at 50% 100%, #fff2d6 0%, transparent 55%),
+      linear-gradient(170deg,#ffd9e8 0%,#e9dcff 55%,#d9f0ff 100%);
+    display:flex;flex-direction:column;align-items:center;
+    padding:1.2rem .8rem 2.4rem;
+    overflow-x:hidden;
+  }
+
+  /* ---------- 背景装饰 ---------- */
+  .sky{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+  .cloud{
+    position:absolute;background:rgba(255,255,255,.72);
+    border-radius:100px;filter:blur(.4px);
+    animation:drift linear infinite;
+  }
+  .cloud::before,.cloud::after{
+    content:"";position:absolute;background:inherit;border-radius:50%;
+  }
+  .cloud.c1{width:9rem;height:2.6rem;top:8%;left:-12rem;animation-duration:48s;}
+  .cloud.c1::before{width:4rem;height:4rem;top:-1.8rem;left:1.4rem;}
+  .cloud.c1::after{width:3rem;height:3rem;top:-1.2rem;left:4.6rem;}
+  .cloud.c2{width:7rem;height:2.1rem;top:26%;left:-10rem;animation-duration:66s;animation-delay:-20s;opacity:.75;}
+  .cloud.c2::before{width:3.2rem;height:3.2rem;top:-1.5rem;left:1.2rem;}
+  .cloud.c3{width:11rem;height:3rem;top:66%;left:-14rem;animation-duration:80s;animation-delay:-45s;opacity:.6;}
+  .cloud.c3::before{width:5rem;height:5rem;top:-2.2rem;left:2rem;}
+  .cloud.c3::after{width:3.6rem;height:3.6rem;top:-1.6rem;left:6.2rem;}
+  @keyframes drift{from{transform:translateX(0)}to{transform:translateX(140vw)}}
+  .twinkle{position:absolute;font-size:1.1rem;opacity:.0;animation:tw 4s ease-in-out infinite;}
+  @keyframes tw{0%,100%{opacity:0;transform:scale(.6) rotate(0)}50%{opacity:.9;transform:scale(1.15) rotate(20deg)}}
+
+  /* ---------- 标题 ---------- */
+  header{position:relative;z-index:2;text-align:center;margin-bottom:.9rem;}
+  h1{
+    margin:.2rem 0 .25rem;font-size:2rem;letter-spacing:.06em;
+    background:linear-gradient(100deg,#ff5f8d,#a855f7 55%,#f0a500);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 2px 0 rgba(255,255,255,.55);
+    animation:wobble 3.6s ease-in-out infinite;
+  }
+  @keyframes wobble{0%,100%{transform:rotate(-1.2deg)}50%{transform:rotate(1.2deg)}}
+  .sub{margin:0;font-size:.82rem;opacity:.72;}
+
+  /* ---------- 机身 ---------- */
+  .machine{
+    position:relative;z-index:2;width:min(36rem,94vw);
+    background:linear-gradient(180deg,#fffdf8,#ffeede);
+    border:.55rem solid var(--gold);
+    border-radius:2rem;
+    padding:1.5rem 1.1rem 1.8rem;
+    box-shadow:
+      0 .9rem 0 var(--gold-deep),
+      0 1.6rem 2.4rem rgba(124,92,240,.28),
+      inset 0 0 0 .25rem #fff;
+  }
+  .machine::before{
+    content:"🎂";position:absolute;top:-1.6rem;left:-1rem;font-size:2.4rem;
+    animation:bob 2.6s ease-in-out infinite;
+  }
+  .machine::after{
+    content:"🎈";position:absolute;top:-2rem;right:-.6rem;font-size:2.2rem;
+    animation:bob 3.1s ease-in-out infinite reverse;
+  }
+  @keyframes bob{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-.5rem) rotate(6deg)}}
+
+  .machine-title{
+    text-align:center;font-size:.9rem;font-weight:700;letter-spacing:.22em;
+    color:var(--pink-deep);margin-bottom:1rem;
+  }
+
+  /* ---------- 转轴区 ---------- */
+  .slots{
+    display:flex;align-items:center;justify-content:center;gap:.45rem;
+    background:linear-gradient(180deg,#ffe9f2,#f3e8ff);
+    border:.3rem solid #fff;
+    border-radius:1.3rem;
+    padding:.85rem .6rem;
+    box-shadow:inset 0 .3rem .7rem rgba(124,92,240,.18);
+  }
+  .reel{
+    flex:1 1 0;min-width:0;height:var(--itemh);
+    overflow:hidden;position:relative;border-radius:.9rem;
+    background:linear-gradient(180deg,#fff,#fff6fb 40%,#fff);
+    border:.22rem solid #ffd8e6;
+    box-shadow:inset 0 .35rem .6rem rgba(0,0,0,.09),inset 0 -.35rem .6rem rgba(0,0,0,.09);
+  }
+  .reel.fixed{
+    flex:1.35 1 0;
+    background:linear-gradient(180deg,#fffaf0,#fff);
+    border-color:var(--gold);
+    box-shadow:inset 0 .3rem .6rem rgba(240,165,0,.22),0 0 0 .18rem rgba(255,209,102,.35);
+    cursor:pointer;
+  }
+  .reel.fixed:hover{transform:translateY(-2px);}
+  .reel-tag{
+    position:absolute;top:-.15rem;left:50%;transform:translateX(-50%);
+    font-size:.5rem;letter-spacing:.08em;color:#fff;background:var(--gold-deep);
+    padding:.05rem .4rem;border-radius:0 0 .35rem .35rem;z-index:3;white-space:nowrap;
+  }
+  .reel-tag.fix{background:var(--purple-deep);}
+  .reel-mask{
+    position:absolute;inset:0;pointer-events:none;z-index:2;
+    background:linear-gradient(180deg,rgba(255,255,255,.85) 0%,transparent 26%,transparent 74%,rgba(255,255,255,.85) 100%);
+  }
+  .strip{will-change:transform;}
+  .reel-item{
+    height:var(--itemh);display:flex;align-items:center;justify-content:center;
+    gap:.25rem;white-space:nowrap;padding:0 .2rem;
+    font-size:clamp(.95rem,4.4vw,1.5rem);font-weight:800;color:var(--purple-deep);
+  }
+  .reel-item .ico{font-size:1.25em;}
+  .reel.static-item{color:var(--pink-deep);font-size:clamp(.95rem,4.6vw,1.6rem);}
+  .reel.fixed .static-item{cursor:pointer;}
+
+  .word{padding:0 .1rem;font-size:clamp(1rem,4.6vw,1.6rem);font-weight:800;color:#7a5c8f;flex:0 0 auto;}
+  #bei{
+    display:inline-block;transition:transform .45s cubic-bezier(.34,1.56,.64,1),color .3s,font-size .45s,text-shadow .3s;
+    transform-origin:center;
+  }
+  #bei.morph{transform:scale(2.4) rotate(-10deg);color:var(--gold-deep);}
+  #bei.ba{
+    font-size:1.85em;color:var(--gold-deep);
+    text-shadow:0 0 .6rem rgba(255,209,102,.95),0 .12rem 0 #fff;
+  }
+  #tail{display:inline-block;transition:transform .4s cubic-bezier(.34,1.56,.64,1);}
+  #tail.pop{transform:scale(1.5) rotate(8deg);color:var(--pink-deep);}
+
+  /* ---------- 拉杆 ---------- */
+  .lever{
+    position:absolute;right:-2.9rem;top:4.4rem;width:2.3rem;z-index:4;
+    display:flex;flex-direction:column;align-items:center;cursor:pointer;
+    user-select:none;
+  }
+  .lever-rod{
+    width:.72rem;height:3.1rem;border-radius:.4rem;
+    background:linear-gradient(90deg,#cfd6e6,#fff 45%,#9aa5bd);
+    box-shadow:0 .1rem .2rem rgba(0,0,0,.2);
+    transform-origin:top center;transition:transform .22s ease-out;
+  }
+  .lever-knob{
+    width:2.3rem;height:2.3rem;border-radius:50%;margin-top:-.45rem;
+    background:radial-gradient(circle at 32% 28%,#ff9db4,#ff2d6f 60%,#c8144a);
+    box-shadow:0 .35rem 0 #9e0f3c,0 .5rem .8rem rgba(0,0,0,.28);
+    transition:transform .22s ease-out;
+  }
+  .lever.pulling .lever-rod{transform:scaleY(1.75);}
+  .lever.pulling .lever-knob{transform:translateY(2.3rem);}
+  .lever-hint{
+    margin-top:.5rem;font-size:.55rem;color:var(--pink-deep);
+    font-weight:700;text-align:center;opacity:.85;
+  }
+
+  /* ---------- 结果展示 ---------- */
+  .result{
+    margin-top:1.15rem;min-height:3.4rem;display:flex;align-items:center;justify-content:center;
+    text-align:center;padding:.5rem .6rem;border-radius:1rem;
+    background:rgba(255,255,255,.7);border:.15rem dashed #ffc7dc;
+  }
+  .sentence{font-size:clamp(1.05rem,5vw,1.55rem);font-weight:800;line-height:1.45;}
+  .sentence .name{color:var(--pink-deep);}
+  .sentence .noun{color:var(--purple-deep);}
+  .sentence .verb{color:#2aa198;}
+  .sentence .egg{color:var(--gold-deep);}
+  .tip{margin-top:.55rem;text-align:center;font-size:.72rem;color:#8a7599;min-height:1.1rem;}
+
+  /* 隐藏小彩蛋：只在结果框内悄悄冒出来，无弹窗、无特效 */
+  .mini{
+    max-height:0;overflow:hidden;opacity:0;margin-top:0;
+    font-size:clamp(.8rem,3.8vw,1rem);font-weight:800;line-height:1.5;
+    color:var(--purple-deep);text-align:center;
+    transition:opacity .4s ease,max-height .45s ease,margin-top .4s ease;
+  }
+  .mini.show{
+    max-height:6rem;margin-top:.55rem;opacity:1;
+    animation:miniIn .55s cubic-bezier(.34,1.56,.64,1);
+  }
+  .mini .paw{margin-right:.25rem;}
+  @keyframes miniIn{
+    from{transform:translateY(.5rem) scale(.92);}
+    to{transform:translateY(0) scale(1);}
+  }
+
+  /* ---------- 状态栏 ---------- */
+  .stats{
+    margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;
+    font-size:.7rem;font-weight:700;color:#7a5c8f;
+  }
+  .chip{background:#fff;border:.15rem solid #ffd8e6;border-radius:999px;padding:.25rem .7rem;}
+  .lucky-bar{
+    margin:.7rem auto 0;width:min(22rem,80%);height:.85rem;border-radius:999px;
+    background:#fff;border:.15rem solid #ffd8e6;overflow:hidden;position:relative;
+  }
+  .lucky-fill{
+    height:100%;width:0;border-radius:999px;
+    background:linear-gradient(90deg,#ffd166,#ff5f8d);
+    transition:width .45s cubic-bezier(.34,1.56,.64,1);
+  }
+  .lucky-bar.hot{animation:glow .7s ease-in-out infinite;border-color:var(--gold-deep);}
+  @keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(255,209,102,.9)}50%{box-shadow:0 0 0 .45rem rgba(255,209,102,.35)}}
+  .lucky-label{text-align:center;font-size:.66rem;margin-top:.35rem;color:#8a7599;font-weight:700;}
+
+  @media (max-width:560px){
+    .machine{width:84vw;padding:1.3rem .8rem 1.6rem;}
+    .lever{right:-1.9rem;top:3.6rem;transform:scale(.82);transform-origin:top center;}
+    .slots{gap:.3rem;padding:.7rem .4rem;}
+    .machine-title{font-size:.75rem;letter-spacing:.12em;}
+  }
+
+  /* ---------- 按钮 ---------- */
+  .actions{margin-top:1rem;display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;}
+  .btn{
+    border:none;cursor:pointer;font-family:inherit;font-weight:800;
+    font-size:.85rem;padding:.6rem 1.35rem;border-radius:999px;color:#fff;
+    background:linear-gradient(180deg,#ff7ba5,#ff2d6f);
+    box-shadow:0 .3rem 0 #c8144a;transition:transform .12s,box-shadow .12s;
+  }
+  .btn:active{transform:translateY(.2rem);box-shadow:0 .1rem 0 #c8144a;}
+  .btn.ghost{
+    background:linear-gradient(180deg,#fff,#ffeef5);color:var(--pink-deep);
+    box-shadow:0 .3rem 0 #ffc7dc;
+  }
+  .btn:disabled{opacity:.55;cursor:not-allowed;}
+
+  /* ---------- 昵称弹窗 ---------- */
+  .overlay{
+    position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+    background:rgba(74,51,85,.5);backdrop-filter:blur(6px);padding:1rem;
+  }
+  .overlay.hide{display:none;}
+  .card{
+    width:min(24rem,94vw);background:linear-gradient(180deg,#fffdf8,#fff0f6);
+    border:.45rem solid var(--gold);border-radius:1.6rem;padding:1.6rem 1.3rem 1.4rem;
+    text-align:center;box-shadow:0 1.2rem 2.4rem rgba(0,0,0,.3);
+    animation:pop .45s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes pop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+  .card h2{margin:.2rem 0 .5rem;font-size:1.35rem;color:var(--pink-deep);}
+  .card p{margin:0 0 1rem;font-size:.82rem;color:#8a7599;line-height:1.6;}
+  .card input{
+    width:100%;font-family:inherit;font-size:1.05rem;font-weight:700;text-align:center;
+    padding:.7rem;border:.2rem solid #ffd8e6;border-radius:.9rem;color:var(--ink);
+    background:#fff;outline:none;
+  }
+  .card input:focus{border-color:var(--purple);}
+
+  /* ---------- 彩蛋层 ---------- */
+  .birth-layer{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden;}
+  .birth-word{
+    position:absolute;font-weight:900;white-space:nowrap;
+    animation:rise 4.2s ease-out forwards;opacity:0;
+  }
+  @keyframes rise{
+    0%{opacity:0;transform:translateY(1.5rem) scale(.4) rotate(var(--rot));}
+    18%{opacity:1;transform:translateY(0) scale(1.05) rotate(var(--rot));}
+    28%{transform:translateY(0) scale(1) rotate(var(--rot));}
+    75%{opacity:1;transform:translateY(-.6rem) scale(1) rotate(var(--rot));}
+    100%{opacity:0;transform:translateY(-3rem) scale(.9) rotate(var(--rot));}
+  }
+  .egg-card{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.5);
+    z-index:70;opacity:0;pointer-events:none;text-align:center;
+    background:linear-gradient(180deg,#fffdf8,#ffeaf3);
+    border:.4rem solid var(--gold);border-radius:1.8rem;padding:1.5rem 2rem;
+    box-shadow:0 1.4rem 3rem rgba(0,0,0,.32);
+    transition:opacity .45s,transform .55s cubic-bezier(.34,1.56,.64,1);
+  }
+  .egg-card.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  .egg-card .big{font-size:clamp(1.6rem,8vw,2.6rem);font-weight:900;color:var(--gold-deep);text-shadow:0 .12rem 0 #fff;}
+  .egg-card .small{margin-top:.5rem;font-size:.85rem;color:#8a7599;font-weight:700;}
+
+  .confetti{position:fixed;top:-3rem;z-index:59;pointer-events:none;font-size:1.2rem;}
+
+  .credits{position:relative;z-index:2;margin-top:1.4rem;font-size:.68rem;color:#9b86a8;text-align:center;line-height:1.8;}
+  .sound-toggle{
+    position:fixed;right:.8rem;top:.8rem;z-index:55;
+    background:#fff;border:.18rem solid #ffd8e6;border-radius:999px;
+    font-size:1rem;padding:.3rem .6rem;cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky" id="sky"></div>
+
+<button class="sound-toggle" id="soundBtn" title="音效开关">🔊</button>
+
+<header>
+  <h1>🎰 生日老虎机 🎰</h1>
+  <p class="sub">拉下魔法拉杆，看看今天你会「被」谁怎么样～</p>
+</header>
+
+<main class="machine">
+  <div class="machine-title">H A P P Y &nbsp; S L O T</div>
+
+  <div class="slots">
+    <div class="reel fixed" id="nameReel" title="点击可修改昵称">
+      <span class="reel-tag fix">你的名字 · 点击修改</span>
+      <div class="reel-mask"></div>
+      <div class="reel-item static-item" id="nameText">小明</div>
+    </div>
+
+    <span class="word"><span id="bei">被</span></span>
+
+    <div class="reel" id="nounReel">
+      <span class="reel-tag">谁 / 什么</span>
+      <div class="reel-mask"></div>
+      <div class="strip" id="nounStrip"></div>
+    </div>
+
+    <div class="reel" id="verbReel">
+      <span class="reel-tag">做了什么</span>
+      <div class="reel-mask"></div>
+      <div class="strip" id="verbStrip"></div>
+    </div>
+
+    <span class="word"><span id="tail">了</span></span>
+  </div>
+
+  <div class="lever" id="lever" title="拉我！">
+    <div class="lever-rod"></div>
+    <div class="lever-knob"></div>
+    <div class="lever-hint">拉我</div>
+  </div>
+
+  <div class="result">
+    <div>
+      <div class="sentence" id="sentence">先设置昵称，再拉下拉杆吧～</div>
+      <div class="mini" id="mini"></div>
+    </div>
+  </div>
+  <div class="tip" id="tip"></div>
+
+  <div class="lucky-bar" id="luckyBar"><div class="lucky-fill" id="luckyFill"></div></div>
+  <div class="lucky-label" id="luckyLabel">幸运值 0 / 10 · 攒满必出彩蛋！</div>
+
+  <div class="stats">
+    <span class="chip">拉动次数：<b id="pullCount">0</b></span>
+    <span class="chip">彩蛋触发：<b id="eggCount">0</b> 🎉</span>
+  </div>
+
+  <div class="actions">
+    <button class="btn" id="spinBtn">🎰 拉一次</button>
+    <button class="btn ghost" id="nameBtn">✏️ 改昵称</button>
+    <button class="btn ghost" id="resetBtn">🔄 重置记录</button>
+  </div>
+</main>
+
+<div class="credits">
+  提示：彩蛋触发时，「被」会悄悄变成「把」——句子就通啦。<br>
+  连拉 10 次还没中？保底机制会强制送你一次彩蛋 🍀
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="card">
+    <h2>🎂 先告诉我你的名字</h2>
+    <p>这个名字会被写进贺卡里，<br>接下来它要接受一整天的「被折腾」🙈</p>
+    <input id="nameInput" type="text" maxlength="8" placeholder="例如：小明" autocomplete="off">
+    <div style="height:1rem"></div>
+    <button class="btn" id="startBtn">开始许愿 ✨</button>
+  </div>
+</div>
+
+<div class="egg-card" id="eggCard">
+  <div class="big" id="eggBig">生日快乐~</div>
+  <div class="small" id="eggSmall">愿所有的好事都「把」你包围</div>
+</div>
+
+<div class="birth-layer" id="birthLayer"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================= 词库（可爱童话 + 幽默） ================= */
+  var NOUNS = [
+    { t:"蛋糕", e:"🎂" },
+    { t:"仓鼠", e:"🐹" },
+    { t:"猫猫", e:"🐱" },
+    { t:"云朵", e:"☁️" },
+    { t:"小熊", e:"🐻" },
+    { t:"流星", e:"✨" }
+  ];
+  var VERBS = ["吃", "投喂", "附体", "绑架", "举高高", "施魔法"];
+  var EGG_NOUN = 0;   // 蛋糕
+  var EGG_VERB = 0;   // 吃
+  var CYCLES = 7;     // 卷轴重复份数，决定滚动长度
+
+  /* 隐藏小彩蛋：命中特定组合时，只在结果框里冒一句话，无弹窗、无特效。
+     key 为 "名词下标-动词下标"（蛋糕0/仓鼠1/猫猫2/云朵3/小熊4/流星5；吃0/投喂1/附体2/绑架3/举高高4/施魔法5） */
+  var MINI_EGGS = {
+    "2-1": "原来投喂人类是这种感觉喵~",
+    "1-5": "变成花栗鼠！biu~",
+    "2-3": "善良猫猫才不会绑架可爱的人类呢，放过你叭~"
+  };
+  function getMiniEgg(n, v){ return MINI_EGGS[n + "-" + v] || ""; }
+
+  /* ================= DOM ================= */
+  var $ = function(id){ return document.getElementById(id); };
+  var nameText   = $("nameText"),   nameReel = $("nameReel");
+  var nounStrip  = $("nounStrip"),  nounReel = $("nounReel");
+  var verbStrip  = $("verbStrip"),  verbReel = $("verbReel");
+  var bei = $("bei"), tail = $("tail");
+  var sentence = $("sentence"), tip = $("tip"), mini = $("mini");
+  var lever = $("lever"), spinBtn = $("spinBtn");
+  var overlay = $("overlay"), nameInput = $("nameInput"), startBtn = $("startBtn");
+  var luckyFill = $("luckyFill"), luckyBar = $("luckyBar"), luckyLabel = $("luckyLabel");
+  var pullCountEl = $("pullCount"), eggCountEl = $("eggCount");
+  var eggCard = $("eggCard"), eggBig = $("eggBig"), eggSmall = $("eggSmall");
+  var birthLayer = $("birthLayer"), soundBtn = $("soundBtn");
+
+  /* ================= 状态 ================= */
+  var nickname = "小明";
+  var spinning = false;
+  var pulls = 0;          // 总拉动次数
+  var sinceEgg = 0;       // 距上次彩蛋的拉动次数（保底用）
+  var eggs = 0;           // 彩蛋累计次数
+  var current = { noun:0, verb:0 };
+  var soundOn = true;
+
+  /* ================= 音效（WebAudio 合成，零外部依赖） ================= */
+  var actx = null;
+  function audio(){
+    if(!soundOn) return null;
+    if(!actx){
+      try { actx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ return null; }
+    }
+    if(actx.state === "suspended") actx.resume();
+    return actx;
+  }
+  function tone(freq, dur, type, vol, delay){
+    var a = audio(); if(!a) return;
+    var t0 = a.currentTime + (delay || 0);
+    var osc = a.createOscillator(), g = a.createGain();
+    osc.type = type || "sine";
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol || 0.06, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(a.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  }
+  function sfxClick(){ tone(180, 0.12, "square", 0.05); tone(90, 0.16, "triangle", 0.05, 0.03); }
+  function sfxTick(){ tone(1180 + Math.random()*220, 0.045, "square", 0.022); }
+  function sfxStop(){ tone(660, 0.14, "triangle", 0.06); }
+  function sfxJackpot(){
+    [523,659,784,1047,1319].forEach(function(f,i){
+      tone(f, 0.5, "triangle", 0.07, i*0.1);
+      tone(f/2, 0.5, "sine", 0.04, i*0.1);
+    });
+  }
+
+  /* ================= 卷轴构建 ================= */
+  function buildStrip(stripEl, items){
+    var html = "";
+    for(var c = 0; c < CYCLES; c++){
+      for(var i = 0; i < items.length; i++){
+        var it = items[i];
+        if(typeof it === "string"){
+          html += '<div class="reel-item">' + it + '</div>';
+        }else{
+          html += '<div class="reel-item"><span class="ico">' + it.e + '</span><span>' + it.t + '</span></div>';
+        }
+      }
+    }
+    stripEl.innerHTML = html;
+  }
+  buildStrip(nounStrip, NOUNS);
+  buildStrip(verbStrip, VERBS);
+
+  function itemHeight(reelEl){
+    var it = reelEl.querySelector(".reel-item");
+    return it ? it.getBoundingClientRect().height : 80;
+  }
+
+  /* 把某个卷轴滚动到指定索引，duration 毫秒后停稳 */
+  function spinReel(stripEl, reelEl, n, targetIdx, duration, onDone){
+    var h = itemHeight(reelEl);
+    var cur = (stripEl === nounStrip) ? current.noun : current.verb;
+    var endOffset = -((CYCLES - 1) * n + targetIdx) * h;
+    stripEl.style.transition = "transform " + duration + "ms cubic-bezier(.16,.86,.24,1)";
+    // 强制读取一次布局，保证 transition 生效
+    void stripEl.offsetHeight;
+    stripEl.style.transform = "translateY(" + endOffset + "px)";
+
+    setTimeout(function(){
+      // 停稳后瞬间归位到等价位置（重复列表，视觉无缝）
+      var tickTimer = stripEl._tickTimer;
+      if(tickTimer){ clearInterval(tickTimer); stripEl._tickTimer = null; }
+      stripEl.style.transition = "none";
+      stripEl.style.transform = "translateY(" + (-targetIdx * h) + "px)";
+      void stripEl.offsetHeight;
+      if(stripEl === nounStrip){ current.noun = targetIdx; } else { current.verb = targetIdx; }
+      sfxStop();
+      if(onDone) onDone();
+    }, duration + 60);
+
+    // 滚动过程中的滴答声
+    if(stripEl._tickTimer) clearInterval(stripEl._tickTimer);
+    stripEl._tickTimer = setInterval(sfxTick, 90);
+    void cur;
+  }
+
+  /* ================= 保底与随机 ================= */
+  function pickPair(){
+    sinceEgg++;
+    if(sinceEgg >= 10){
+      // 保底：第 10 次强制彩蛋组合
+      return { n:EGG_NOUN, v:EGG_VERB, forced:true };
+    }
+    var n = Math.floor(Math.random() * NOUNS.length);
+    var v = Math.floor(Math.random() * VERBS.length);
+    return { n:n, v:v, forced:false };
+  }
+
+  function isEgg(n, v){ return n === EGG_NOUN && v === EGG_VERB; }
+
+  /* ================= 渲染句子 ================= */
+  function renderSentence(nIdx, vIdx, eggMode){
+    var noun = NOUNS[nIdx], verb = VERBS[vIdx];
+    var beiHtml = eggMode ? '<span class="egg">把</span>' : '被';
+    sentence.innerHTML =
+      '<span class="name">「' + esc(nickname) + '」</span>' +
+      beiHtml +
+      '<span class="noun">「' + noun.e + noun.t + '」</span>' +
+      '<span class="verb">「' + verb + '」</span>' +
+      (eggMode ? '<span class="egg">了！🎉</span>' : '了');
+    // 同步刷新隐藏小彩蛋（大彩蛋时不叠加显示）
+    showMini(eggMode ? "" : getMiniEgg(nIdx, vIdx));
+  }
+  function showMini(text){
+    if(!text){
+      mini.classList.remove("show");
+      mini.innerHTML = "";
+      return;
+    }
+    // 先移除再重新添加，保证每次触发都重播一次淡入
+    mini.classList.remove("show");
+    void mini.offsetHeight;
+    mini.innerHTML = '<span class="paw">🐾</span>' + esc(text);
+    mini.classList.add("show");
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function updateLucky(){
+    var pct = Math.min(100, (sinceEgg / 10) * 100);
+    luckyFill.style.width = pct + "%";
+    luckyLabel.textContent = "幸运值 " + sinceEgg + " / 10 · " + (sinceEgg >= 9 ? "下一拉必出彩蛋！✨" : "攒满必出彩蛋！");
+    if(sinceEgg >= 9) luckyBar.classList.add("hot");
+    else luckyBar.classList.remove("hot");
+  }
+
+  /* ================= 彩蛋动画 ================= */
+  var EGG_COLORS = ["#ff5f8d","#a855f7","#f0a500","#2aa198","#ff8fb1","#7c5cf0","#ff6b6b"];
+  function showBirthWords(){
+    birthLayer.innerHTML = "";
+    var texts = ["生日快乐~","生日快乐~","生日快乐~","Happy Birthday!","生日快乐~","🎂 生日快乐 ~","生日快乐~"];
+    for(var i = 0; i < 16; i++){
+      var s = document.createElement("span");
+      s.className = "birth-word";
+      s.textContent = texts[Math.floor(Math.random() * texts.length)];
+      var left = Math.random() * 78 + 2;
+      var top = Math.random() * 74 + 6;
+      var rot = (Math.random() * 40 - 20).toFixed(1);
+      var size = (1.1 + Math.random() * 1.5).toFixed(2);
+      s.style.left = left + "vw";
+      s.style.top = top + "vh";
+      s.style.fontSize = size + "rem";
+      s.style.color = EGG_COLORS[Math.floor(Math.random() * EGG_COLORS.length)];
+      s.style.setProperty("--rot", rot + "deg");
+      s.style.textShadow = "0 .1rem 0 rgba(255,255,255,.9)";
+      s.style.animationDelay = (Math.random() * 1.4).toFixed(2) + "s";
+      birthLayer.appendChild(s);
+    }
+    setTimeout(function(){ birthLayer.innerHTML = ""; }, 6200);
+  }
+
+  function confettiBurst(){
+    var emo = ["🎊","🎉","🎈","⭐","🍰","🍬","✨","🕯️","🎁","💖"];
+    for(var i = 0; i < 60; i++){
+      (function(i){
+        var d = document.createElement("div");
+        d.className = "confetti";
+        d.textContent = emo[Math.floor(Math.random() * emo.length)];
+        d.style.left = (Math.random() * 100) + "vw";
+        d.style.fontSize = (0.9 + Math.random() * 1.3).toFixed(2) + "rem";
+        d.style.opacity = "1";
+        document.body.appendChild(d);
+        var dur = 2200 + Math.random() * 2200;
+        var delay = Math.random() * 900;
+        var drift = (Math.random() * 200 - 100).toFixed(0);
+        d.animate([
+          { transform:"translate(0,0) rotate(0deg)", opacity:1 },
+          { transform:"translate(" + drift + "px," + (window.innerHeight + 120) + "px) rotate(" + (Math.random()*720-360).toFixed(0) + "deg)", opacity:0.9 }
+        ], { duration:dur, delay:delay, easing:"cubic-bezier(.3,.5,.6,1)", fill:"forwards" });
+        setTimeout(function(){ d.remove(); }, dur + delay + 100);
+      })(i);
+    }
+  }
+
+  /* 「被」→「把」变形动画 */
+  function beiToBa(done){
+    bei.classList.add("morph");
+    sfxJackpot();
+    setTimeout(function(){
+      bei.textContent = "把";
+      bei.classList.add("ba");
+    }, 430);
+    setTimeout(function(){
+      bei.classList.remove("morph");
+      tail.classList.add("pop");
+    }, 780);
+    setTimeout(function(){
+      tail.classList.remove("pop");
+      if(done) done();
+    }, 1250);
+  }
+
+  function resetBei(){
+    bei.textContent = "被";
+    bei.classList.remove("ba", "morph");
+  }
+
+  function triggerEgg(){
+    eggs++;
+    eggCountEl.textContent = eggs;
+    sinceEgg = 0;
+    updateLucky();
+
+    // 先以正常句式呈现，等「被」完成形变后再改写为「把」字句
+    renderSentence(EGG_NOUN, EGG_VERB, false);
+    beiToBa(function(){
+      renderSentence(EGG_NOUN, EGG_VERB, true);
+      eggBig.textContent = "🎂 生日快乐，" + nickname + " ~";
+      var lines = [
+        "愿所有的好事都「把」你包围",
+        "可爱的小动物们骑着云朵和流星送来了祝福",
+        "「被」字退场，「把」字登场：好事都归你啦",
+        "新的一岁，继续可爱，继续被世界偏爱"
+      ];
+      eggSmall.textContent = lines[Math.floor(Math.random() * lines.length)];
+      eggCard.classList.add("show");
+      showBirthWords();
+      confettiBurst();
+      setTimeout(function(){ eggCard.classList.remove("show"); }, 4200);
+      tip.textContent = "🎊 彩蛋达成！「被」变成了「把」，句子终于说通了～";
+    });
+  }
+
+  /* ================= 主流程：拉杆 ================= */
+  function pull(){
+    if(spinning) return;
+    if(!nickname){ openNameDialog(); return; }
+    spinning = true;
+    spinBtn.disabled = true;
+    resetBei();
+    showMini("");               // 滚动开始前先收起上一轮的小彩蛋
+    tip.textContent = "咕噜咕噜……命运正在转动……";
+
+    lever.classList.add("pulling");
+    sfxClick();
+
+    setTimeout(function(){
+      lever.classList.remove("pulling");
+
+      var pair = pickPair();
+      pulls++;
+      pullCountEl.textContent = pulls;
+      updateLucky();
+
+      // 名词先转，动词稍慢一点，营造真实老虎机的错落感
+      spinReel(nounStrip, nounReel, NOUNS.length, pair.n, 2400);
+      setTimeout(function(){
+        spinReel(verbStrip, verbReel, VERBS.length, pair.v, 2700, function(){
+          // 全部停稳
+          var egg = isEgg(pair.n, pair.v);
+          if(!egg){
+            renderSentence(pair.n, pair.v, false);
+            tip.textContent = "唔……再来一次？（连拉 10 次必出彩蛋 🍀）";
+            spinning = false;
+            spinBtn.disabled = false;
+          }else{
+            tip.textContent = pair.forced ? "🍀 保底触发！命运兜住了你……" : "✨ 触发彩蛋！……";
+            triggerEgg();
+            setTimeout(function(){
+              spinning = false;
+              spinBtn.disabled = false;
+            }, 1500);
+          }
+        });
+      }, 320);
+    }, 240);
+  }
+
+  /* ================= 昵称 ================= */
+  function openNameDialog(){
+    overlay.classList.remove("hide");
+    nameInput.value = nickname;
+    setTimeout(function(){ nameInput.focus(); nameInput.select(); }, 60);
+  }
+  function setNickname(v){
+    nickname = v && v.trim() ? v.trim().slice(0, 8) : "小明";
+    nameText.textContent = nickname;
+    // 昵称越长，字号自动越小，保证不溢出窗口
+    var len = nickname.length;
+    nameText.style.fontSize = len <= 2 ? "1.7rem" : (len <= 4 ? "1.4rem" : (len <= 6 ? "1.15rem" : "0.95rem"));
+  }
+  function applyName(){
+    setNickname(nameInput.value);
+    overlay.classList.add("hide");
+    resetBei();
+    if(pulls > 0){
+      // 已经拉过：用新昵称重绘当前结果
+      renderSentence(current.noun, current.verb, isEgg(current.noun, current.verb));
+    }else{
+      tip.textContent = "好了！拉一下右边的拉杆试试 👉";
+    }
+  }
+
+  /* ================= 绑定 ================= */
+  lever.addEventListener("click", pull);
+  spinBtn.addEventListener("click", pull);
+  nameReel.addEventListener("click", openNameDialog);
+  $("nameBtn").addEventListener("click", openNameDialog);
+  startBtn.addEventListener("click", applyName);
+  nameInput.addEventListener("keydown", function(e){ if(e.key === "Enter") applyName(); });
+  $("resetBtn").addEventListener("click", function(){
+    pulls = 0; sinceEgg = 0; eggs = 0;
+    pullCountEl.textContent = "0";
+    eggCountEl.textContent = "0";
+    updateLucky();
+    resetBei();
+    showMini("");
+    tip.textContent = "记录已清空，重新开始吧～";
+  });
+  soundBtn.addEventListener("click", function(){
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? "🔊" : "🔇";
+  });
+
+  // 窗口尺寸变化时，卷轴重新对齐，避免错位
+  window.addEventListener("resize", function(){
+    [ {s:nounStrip, r:nounReel, i:current.noun},
+      {s:verbStrip, r:verbReel, i:current.verb} ].forEach(function(o){
+      var h = itemHeight(o.r);
+      o.s.style.transition = "none";
+      o.s.style.transform = "translateY(" + (-o.i * h) + "px)";
+    });
+  });
+
+  /* ================= 背景装饰 ================= */
+  (function decorate(){
+    var sky = $("sky");
+    var stars = ["✨","⭐","🌟","💫","🤍","🍬"];
+    for(var i = 0; i < 18; i++){
+      var s = document.createElement("span");
+      s.className = "twinkle";
+      s.textContent = stars[i % stars.length];
+      s.style.left = (Math.random() * 96) + "vw";
+      s.style.top = (Math.random() * 92) + "vh";
+      s.style.animationDelay = (Math.random() * 4).toFixed(2) + "s";
+      s.style.fontSize = (0.8 + Math.random() * 0.9).toFixed(2) + "rem";
+      sky.appendChild(s);
+    }
+  })();
+
+  /* ================= 初始化 ================= */
+  setNickname(nickname);
+  updateLucky();
+  openNameDialog();
+})();
+</script>
+</body>
+</html>
