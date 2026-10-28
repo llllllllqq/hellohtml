@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>提醒器</title>
+<style>
+:root{
+  --bg:#f2f3f5; --card:#fff; --line:#e3e5e8; --line2:#f0f1f3;
+  --t1:#1f2329; --t2:#646a73; --t3:#8f959e; --t4:#b0b4ba;
+  --pri:#1a6dd4; --priBg:#eef4fc; --priLine:#c3daf5;
+  --ok:#1a7f43; --okBg:#eef7f0; --okLine:#cde4d5;
+  --warn:#a86200; --warnBg:#fdf6e8; --warnLine:#f0dcb4;
+  --dan:#c93838; --danBg:#fdeeee; --danLine:#f2cccc;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);color:var(--t1);
+  font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;}
+input,select{font:inherit;color:inherit;}
+input[type=text],input[type=number],input[type=time],input[type=date],select{
+  width:100%;height:36px;padding:0 10px;border:1px solid var(--line);border-radius:6px;
+  background:#fff;outline:none;
+}
+input[type=text]:focus,input[type=number]:focus,input[type=time]:focus,
+input[type=date]:focus,select:focus{border-color:var(--pri);box-shadow:0 0 0 3px var(--priBg);}
+input[type=number]{-moz-appearance:textfield;}
+
+.wrap{max-width:660px;margin:0 auto;padding:20px 16px 48px;}
+.app{background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+
+/* ---- 顶栏 ---- */
+.hd{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line2);}
+.hd-title{font-size:15px;font-weight:600;letter-spacing:.2px;}
+.hd-time{font-size:13px;color:var(--t3);font-variant-numeric:tabular-nums;letter-spacing:.3px;}
+
+/* ---- 状态条 ---- */
+.status{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 18px;font-size:13px;cursor:pointer;transition:background .15s;}
+.status.ok{background:var(--okBg);color:var(--ok);}
+.status.warn{background:var(--warnBg);color:var(--warn);}
+.status.bad{background:var(--danBg);color:var(--dan);}
+.status .tag{font-size:12px;padding:2px 8px;border-radius:4px;background:#fff;white-space:nowrap;}
+.status.ok .tag{border:1px solid var(--okLine);}
+.status.warn .tag{border:1px solid var(--warnLine);}
+.status.bad .tag{border:1px solid var(--danLine);}
+.status-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ---- 下一个 ---- */
+.next{padding:11px 18px;background:#fafbfc;border-bottom:1px solid var(--line2);
+  font-size:12.5px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.next b{color:var(--t1);font-weight:500;}
+.next .cd{color:var(--pri);font-variant-numeric:tabular-nums;}
+
+/* ---- 列表 ---- */
+.list{min-height:8px;}
+.item{display:flex;align-items:flex-start;padding:14px 18px;border-bottom:1px solid var(--line2);}
+.item:last-child{border-bottom:none;}
+.item.off .item-label{color:var(--t3);}
+.item.off .dot{background:var(--t4);}
+.item-main{flex:1;min-width:0;}
+.item-top{display:flex;align-items:flex-start;margin-bottom:5px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:9px;margin-top:7px;flex:none;}
+.item-label{flex:1;min-width:0;font-size:14px;font-weight:500;line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-wrap:break-word;}
+.item-sub{font-size:12.5px;color:var(--t3);padding-left:16px;line-height:1.6;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-wrap:break-word;}
+.item-sub .warnText{color:var(--dan);}
+.item-ops{display:flex;flex:none;padding-left:12px;}
+.item-ops button{font-size:12.5px;padding:3px 10px;border-radius:4px;border:1px solid var(--line);color:var(--t2);margin-left:6px;white-space:nowrap;}
+.item-ops button:hover{background:#f7f8f9;}
+.item-ops button.del{color:var(--dan);border-color:var(--danLine);}
+.item-ops button.del:hover{background:var(--danBg);}
+
+.empty{padding:36px 24px;text-align:center;color:var(--t3);font-size:13px;line-height:1.9;}
+.empty b{display:block;color:var(--t2);font-size:14px;font-weight:500;margin-bottom:6px;}
+
+/* ---- 添加 ---- */
+.addbox{padding:16px 18px;}
+.addbtn{display:block;width:100%;text-align:center;font-size:13.5px;font-weight:500;color:var(--pri);
+  border:1px dashed var(--priLine);border-radius:6px;padding:10px;background:#f7fafd;transition:.15s;}
+.addbtn:hover{background:var(--priBg);}
+
+/* ---- 页脚 ---- */
+.foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  padding:12px 18px;border-top:1px solid var(--line2);background:#fafbfc;font-size:12px;color:var(--t3);}
+.foot .links{white-space:nowrap;}
+.foot button.link{color:var(--pri);margin-left:12px;font-size:12px;}
+.foot button.link:hover{text-decoration:underline;}
+.foot .cfgname{color:var(--t2);}
+
+/* ---- 提示条 ---- */
+.banner{display:none;padding:10px 18px;font-size:12.5px;background:var(--warnBg);color:var(--warn);
+  border-bottom:1px solid var(--warnLine);}
+.banner.show{display:block;}
+.banner button{color:var(--pri);text-decoration:underline;margin-left:6px;font-size:12.5px;}
+
+/* ---- 遮罩与对话框 ---- */
+.mask{position:fixed;left:0;top:0;right:0;bottom:0;z-index:100;
+  background:rgba(18,20,24,.55);display:flex;align-items:center;justify-content:center;padding:20px;}
+.mask.hidden{display:none;}
+.dialog{background:#fff;border-radius:10px;width:100%;max-width:460px;
+  max-height:92vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.22);}
+
+.dlg-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;}
+.dlg-hd h3{margin:0;font-size:15px;font-weight:600;}
+.dlg-hd .x{font-size:20px;line-height:1;color:var(--t3);padding:2px 6px;}
+.dlg-hd .x:hover{color:var(--t1);}
+.dlg-bd{padding:0 20px 4px;}
+.dlg-ft{display:flex;justify-content:flex-end;padding:16px 20px 18px;}
+
+.field{margin-bottom:14px;}
+.field > label{display:block;font-size:12.5px;color:var(--t2);margin-bottom:6px;}
+.hintline{font-size:11.5px;color:var(--t3);margin-top:5px;line-height:1.6;}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+.seg button{flex:1;padding:7px 0;font-size:12.5px;color:var(--t2);border-right:1px solid var(--line);}
+.seg button:last-child{border-right:none;}
+.seg button.on{background:var(--priBg);color:var(--pri);font-weight:500;}
+
+.row{display:flex;}
+.row > *{margin-right:8px;}
+.row > *:last-child{margin-right:0;}
+.row .grow{flex:1;min-width:0;}
+
+.dows{display:flex;flex-wrap:wrap;margin:-3px;}
+.dows label{display:block;margin:3px;}
+.dows input{position:absolute;opacity:0;width:0;height:0;}
+.dows span{display:block;width:34px;height:32px;line-height:30px;text-align:center;
+  font-size:12.5px;color:var(--t2);border:1px solid var(--line);border-radius:6px;cursor:pointer;}
+.dows input:checked + span{background:var(--priBg);color:var(--pri);border-color:var(--priLine);font-weight:500;}
+
+.btn{display:inline-block;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:500;text-align:center;}
+.btn.pri{background:var(--pri);color:#fff;}
+.btn.pri:hover{background:#1560bd;}
+.btn.ghost{border:1px solid var(--line);color:var(--t2);margin-left:10px;}
+.btn.ghost:hover{background:#f7f8f9;}
+.btn.mini{padding:5px 10px;font-size:12px;font-weight:400;}
+
+/* ---- 提醒弹层 ---- */
+.alarm .dialog{max-width:420px;text-align:center;padding:30px 24px 24px;}
+.alarm-kicker{font-size:12px;color:var(--dan);letter-spacing:1px;margin-bottom:10px;}
+.alarm-label{font-size:28px;font-weight:600;line-height:1.3;margin-bottom:8px;word-break:break-word;}
+.alarm-time{font-size:13px;color:var(--t3);margin-bottom:6px;}
+.alarm-extra{font-size:12.5px;color:var(--warn);margin-bottom:22px;min-height:18px;}
+.alarm-btns{display:flex;}
+.alarm-btns .btn{flex:1;padding:11px 0;}
+.alarm-list{margin:14px 0 20px;font-size:12.5px;color:var(--t2);line-height:1.9;}
+
+/* ---- toast ---- */
+#toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%) translateY(10px);
+  background:rgba(31,35,41,.92);color:#fff;font-size:13px;padding:9px 16px;border-radius:6px;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:200;
+  max-width:86vw;text-align:center;line-height:1.5;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media (max-width:520px){
+  .wrap{padding:12px 10px 40px;}
+  .item{padding:13px 14px;}
+  .item-ops{padding-left:8px;}
+  .item-ops button{font-size:11.5px;padding:3px 7px;margin-left:4px;}
+  .item-sub{padding-left:16px;}
+  .alarm-label{font-size:24px;}
+  .foot{flex-direction:column;align-items:flex-start;}
+  .foot .links{margin-top:7px;}
+  .foot button.link{margin-left:0;margin-right:14px;}
+  .next{white-space:normal;line-height:1.6;}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="app">
+
+    <div class="hd">
+      <div class="hd-title">提醒器</div>
+      <div class="hd-time" id="clock">--:--:--</div>
+    </div>
+
+    <div class="status bad" id="statusBar">
+      <span class="status-text" id="statusText">正在检查声音状态…</span>
+      <span class="tag" id="statusTag">点击启用</span>
+    </div>
+
+    <div class="banner" id="banner"></div>
+
+    <div class="next" id="nextLine">—</div>
+
+    <div class="list" id="list"></div>
+
+    <div class="addbox">
+      <button class="addbtn" id="addBtn">+ 添加提醒</button>
+    </div>
+
+    <div class="foot">
+      <span id="footInfo"></span>
+      <span class="links">
+        <button class="link" id="btnSave">导出备份</button>
+        <button class="link" id="btnLoad">从备份导入</button>
+      </span>
+    </div>
+
+  </div>
+</div>
+
+<!-- 编辑对话框 -->
+<div class="mask hidden" id="editorMask">
+  <div class="dialog">
+    <div class="dlg-hd">
+      <h3 id="editorTitle">添加提醒</h3>
+      <button class="x" id="editorClose">×</button>
+    </div>
+    <div class="dlg-bd">
+
+      <div class="field">
+        <label>提醒内容</label>
+        <input type="text" id="fLabel" placeholder="例如：吃降压药" maxlength="40">
+      </div>
+
+      <div class="field">
+        <label>重复方式</label>
+        <div class="seg" id="segType">
+          <button data-type="daily" class="on">每天</button>
+          <button data-type="weekly">每周</button>
+          <button data-type="monthly">每月</button>
+          <button data-type="once">一次性</button>
+        </div>
+      </div>
+
+      <div class="field" id="rowWeekly" style="display:none">
+        <label>星期几（可多选）</label>
+        <div class="dows" id="dowsBox"></div>
+      </div>
+
+      <div class="field" id="rowMonthly" style="display:none">
+        <label>每月几号</label>
+        <div class="row">
+          <input type="number" id="fDay" min="1" max="31" value="15" class="grow">
+          <span style="line-height:36px;color:var(--t3);font-size:13px;margin-right:0">日</span>
+        </div>
+        <div class="hintline">若该月没有这天（如 2 月 31 日），默认按当月最后一天提醒。</div>
+      </div>
+
+      <div class="field" id="rowOnce" style="display:none">
+        <label>日期</label>
+        <input type="date" id="fDate">
+      </div>
+
+      <div class="field">
+        <label>提醒时间</label>
+        <div class="row">
+          <input type="time" id="fTime" value="09:00" class="grow">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>提示音文件（可选）</label>
+        <div class="row">
+          <input type="text" id="fAudio" class="grow" placeholder="留空则使用内置提示音">
+          <button class="btn ghost mini" id="btnPreview" style="margin-left:8px;height:36px;flex:none;">试听</button>
+        </div>
+        <div class="hintline">填与本网页同文件夹的音频文件名，例如 <code>a.mp3</code> 或 <code>sounds/ding.wav</code>，支持 mp3 / wav / ogg / m4a。</div>
+      </div>
+
+    </div>
+    <div class="dlg-ft">
+      <button class="btn ghost" id="editorCancel" style="margin-left:0;margin-right:10px;">取消</button>
+      <button class="btn pri" id="editorSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 提醒弹层 -->
+<div class="mask hidden alarm" id="alarmMask">
+  <div class="dialog">
+    <div class="alarm-kicker">提 醒</div>
+    <div class="alarm-label" id="alarmLabel">—</div>
+    <div class="alarm-time" id="alarmTime"></div>
+    <div class="alarm-extra" id="alarmExtra"></div>
+    <div class="alarm-list" id="alarmList"></div>
+    <div class="alarm-btns">
+      <button class="btn pri" id="btnAck">我知道了</button>
+      <button class="btn ghost" id="btnSnooze" style="margin-left:10px;">稍后再说</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<input type="file" id="fileInput" accept=".txt,.js,.json,text/plain,text/javascript,application/json" style="display:none">
+
+<script src="config.txt" onerror="window.__noConfigFile=1"></script>
+<script>
+/* =====================================================================
+   提醒器 — 单文件离线版
+   运行环境：双击打开（file://），Chrome 74+
+   配置存储：浏览器 IndexedDB（config.txt 仅作备份，可导入导出）
+   音频文件：同目录相对路径
+   ===================================================================== */
+(function () {
+'use strict';
+
+/* ---------- 常量 ---------- */
+var LS_KEY = 'reminder_v1::data';
+var OWNER_KEY = 'reminder_v1::owner';
+var DB_NAME = 'reminder_app';
+var DB_VER = 1;
+var DB_STORE = 'kv';
+var DB_KEY = 'config';
+var SILENT_WAV = 'data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+var WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];
+
+/* ---------- 运行时状态 ---------- */
+var data = null;            // { version, settings, jobs:[] }
+var alarms = [];            // 待确认的提醒
+var snoozes = [];           // { at, jobId }
+var alarmOpen = false;
+var editorJob = null;       // null=新建
+var editorType = 'daily';
+var audioReady = false;
+var audioBlocked = false;
+var ctx = null;
+var masterGain = null;
+var alarmAudio = null;
+var synthTimer = null;
+var autoStopTimer = null;
+var flashTimer = null;
+var origTitle = document.title;
+var tickTimer = null;
+var isOwner = false;
+var TAB_ID = '';
+
+/* ---------- DOM ---------- */
+function $(id) { return document.getElementById(id); }
+var elClock = $('clock'), elStatus = $('statusBar'), elStatusText = $('statusText'),
+    elStatusTag = $('statusTag'), elBanner = $('banner'), elNext = $('nextLine'),
+    elList = $('list'), elFootInfo = $('footInfo');
+
+/* =====================================================================
+   工具函数
+   ===================================================================== */
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
+
+function dayDiff(msA, msB) {
+  return Math.round((startOfDay(new Date(msA)) - startOfDay(new Date(msB))) / 86400000);
+}
+
+function fmtClock(d) {
+  return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+}
+
+function fmtMonthDay(d) { return (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日'; }
+
+function fmtFullDate(d) {
+  return d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
+}
+
+/* 把某个时间点显示成「今天 09:00」这种 */
+function fmtWhen(ms) {
+  var d = new Date(ms), now = new Date();
+  var diff = dayDiff(ms, now.getTime());
+  var hm = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  if (diff === 0) return '今天 ' + hm;
+  if (diff === 1) return '明天 ' + hm;
+  if (diff === 2) return '后天 ' + hm;
+  if (diff === -1) return '昨天 ' + hm;
+  if (d.getFullYear() === now.getFullYear()) return fmtMonthDay(d) + ' ' + hm;
+  return fmtFullDate(d) + ' ' + hm;
+}
+
+/* 倒计时文字 */
+function fmtRemain(ms) {
+  if (ms < 0) {
+    var late = -ms;
+    if (late < 60000) return '已超时';
+    if (late < 3600000) return '已超时 ' + Math.floor(late / 60000) + ' 分钟';
+    return '已超时 ' + Math.floor(late / 3600000) + ' 小时';
+  }
+  var s = Math.floor(ms / 1000);
+  if (s < 60) return '还有 ' + s + ' 秒';
+  var m = Math.floor(s / 60);
+  if (m < 60) return '还有 ' + m + ' 分钟';
+  var h = Math.floor(m / 60);
+  if (h < 24) return '还有 ' + h + ' 小时 ' + (m % 60) + ' 分';
+  return '还有 ' + Math.floor(h / 24) + ' 天 ' + (h % 24) + ' 小时';
+}
+
+/* 音频相对路径安全编码：逐段 encodeURIComponent，处理中文/空格/# */
+function audioUrl(name) {
+  return String(name).split('/').map(function (seg) { return encodeURIComponent(seg); }).join('/');
+}
+
+/* =====================================================================
+   规则引擎：给定规则和起点，求下一次触发时刻
+   ===================================================================== */
+function nextAt(rule, fromMs) {
+  if (!rule) return null;
+  var from = new Date(fromMs);
+  var y = from.getFullYear(), mo = from.getMonth(), d = from.getDate();
+  var c, i, mm, dim, day;
+
+  if (rule.type === 'once') {
+    return rule.at > fromMs ? rule.at : null;
+  }
+
+  if (rule.type === 'daily') {
+    c = new Date(y, mo, d, rule.h, rule.m, 0, 0);
+    if (c.getTime() <= fromMs) c = new Date(y, mo, d + 1, rule.h, rule.m, 0, 0);
+    return c.getTime();
+  }
+
+  if (rule.type === 'weekly') {
+    if (!rule.dows || !rule.dows.length) return null;
+    for (i = 0; i < 8; i++) {
+      c = new Date(y, mo, d + i, rule.h, rule.m, 0, 0);
+      if (c.getTime() <= fromMs) continue;
+      if (rule.dows.indexOf(c.getDay()) >= 0) return c.getTime();
+    }
+    return null;
+  }
+
+  if (rule.type === 'monthly') {
+    for (i = 0; i <= 24; i++) {
+      mm = mo + i;
+      dim = new Date(y, mm + 1, 0).getDate();  // 该月天数，mm 溢出会自动进位
+      day = rule.day;
+      if (day > dim) {
+        if (rule.overflow === 'skip') continue;
+        day = dim;                              // 默认取当月最后一天
+      }
+      c = new Date(y, mm, day, rule.h, rule.m, 0, 0);
+      if (c.getTime() > fromMs) return c.getTime();
+    }
+    return null;
+  }
+
+  return null;
+}
+
+/* 规则的人话描述 */
+function describeRule(rule) {
+  if (!rule) return '';
+  var t = pad2(rule.h) + ':' + pad2(rule.m);
+
+  if (rule.type === 'daily') return '每天 ' + t;
+
+  if (rule.type === 'once') {
+    var d = new Date(rule.at);
+    return fmtFullDate(d) + ' ' + t + ' · 一次性';
+  }
+
+  if (rule.type === 'weekly') {
+    var ds = rule.dows.slice().sort(function (a, b) { return a - b; });
+    if (!ds.length) return '未选择星期';
+    if (ds.length === 7) return '每天 ' + t;
+    if (ds.length === 5 && ds.join(',') === '1,2,3,4,5') return '工作日 ' + t;
+    if (ds.length === 2 && ds.join(',') === '0,6') return '周末 ' + t;
+    return '每周' + ds.map(function (x) { return WEEK_CN[x]; }).join('、') + ' ' + t;
+  }
+
+  if (rule.type === 'monthly') return '每月 ' + rule.day + ' 日 ' + t;
+
+  return '';
+}
+
+/* =====================================================================
+   数据：规范化 / 读写
+   ===================================================================== */
+function defaultSettings() {
+  return { volume: 0.8, soundOn: true, snoozeMin: 5, catchUpMin: 60 };
+}
+
+function normalize(raw) {
+  var out = {
+    version: 2,
+    settings: defaultSettings(),
+    jobs: [],
+    lastEditAt: 0,
+    lastExportAt: 0,
+    loadedName: ''
+  };
+  if (!raw || typeof raw !== 'object') return out;
+
+  if (raw.settings && typeof raw.settings === 'object') {
+    var s = raw.settings;
+    if (typeof s.volume === 'number') out.settings.volume = Math.max(0, Math.min(1, s.volume));
+    if (typeof s.soundOn === 'boolean') out.settings.soundOn = s.soundOn;
+    if (typeof s.snoozeMin === 'number') out.settings.snoozeMin = s.snoozeMin;
+    if (typeof s.catchUpMin === 'number') out.settings.catchUpMin = s.catchUpMin;
+  }
+
+  if (typeof raw.lastEditAt === 'number') out.lastEditAt = raw.lastEditAt;
+  if (typeof raw.lastExportAt === 'number') out.lastExportAt = raw.lastExportAt;
+  if (typeof raw.loadedName === 'string') out.loadedName = raw.loadedName;
+
+  var list = raw.jobs || raw.reminders || [];
+  if (Object.prototype.toString.call(list) !== '[object Array]') list = [];
+
+  out.jobs = list.map(function (j) {
+    if (!j || typeof j !== 'object' || !j.rule) return null;
+    var r = j.rule;
+    var rule = { type: r.type, h: 0, m: 0 };
+
+    if (r.type === 'once') {
+      if (typeof r.at !== 'number') return null;
+      rule.at = r.at;
+      var dd = new Date(r.at);
+      rule.h = dd.getHours(); rule.m = dd.getMinutes();
+    } else if (r.type === 'daily' || r.type === 'weekly' || r.type === 'monthly') {
+      rule.h = Math.max(0, Math.min(23, parseInt(r.h, 10) || 0));
+      rule.m = Math.max(0, Math.min(59, parseInt(r.m, 10) || 0));
+      if (r.type === 'weekly') {
+        rule.dows = (r.dows || []).map(function (x) { return parseInt(x, 10); })
+          .filter(function (x) { return x >= 0 && x <= 6; });
+        if (!rule.dows.length) return null;
+      }
+      if (r.type === 'monthly') {
+        rule.day = Math.max(1, Math.min(31, parseInt(r.day, 10) || 1));
+        rule.overflow = r.overflow === 'skip' ? 'skip' : 'last';
+      }
+    } else {
+      return null;
+    }
+
+    return {
+      id: j.id || ('j' + Math.random().toString(36).slice(2, 9)),
+      label: String(j.label || '提醒').slice(0, 40),
+      rule: rule,
+      audio: String(j.audio || '').trim(),
+      enabled: j.enabled !== false,
+      nextAt: null
+    };
+  }).filter(Boolean);
+
+  return out;
+}
+
+/* =====================================================================
+   存储层：IndexedDB 为主，localStorage 兜底
+   ===================================================================== */
+var db = null;
+var storageMode = 'local';   // 'idb' | 'local'
+
+function openDB() {
+  return new Promise(function (resolve, reject) {
+    if (!window.indexedDB) { reject(new Error('IndexedDB 不可用')); return; }
+    var req;
+    try { req = indexedDB.open(DB_NAME, DB_VER); }
+    catch (e) { reject(e); return; }
+
+    var settled = false;
+    req.onupgradeneeded = function () {
+      var d = req.result;
+      if (!d.objectStoreNames.contains(DB_STORE)) d.createObjectStore(DB_STORE);
+    };
+    req.onsuccess = function () { if (!settled) { settled = true; resolve(req.result); } };
+    req.onerror = function () { if (!settled) { settled = true; reject(req.error || new Error('打开失败')); } };
+    req.onblocked = function () { if (!settled) { settled = true; reject(new Error('数据库被其它页面占用')); } };
+  });
+}
+
+function openDBWithTimeout(ms) {
+  return new Promise(function (resolve, reject) {
+    var done = false;
+    var t = setTimeout(function () {
+      if (!done) { done = true; reject(new Error('打开数据库超时')); }
+    }, ms || 3000);
+    openDB().then(function (d) {
+      if (!done) { done = true; clearTimeout(t); resolve(d); }
+    }).catch(function (e) {
+      if (!done) { done = true; clearTimeout(t); reject(e); }
+    });
+  });
+}
+
+function idbGet(key) {
+  return new Promise(function (resolve, reject) {
+    if (!db) { resolve(null); return; }
+    try {
+      var tx = db.transaction(DB_STORE, 'readonly');
+      var g = tx.objectStore(DB_STORE).get(key);
+      g.onsuccess = function () { resolve(g.result === undefined ? null : g.result); };
+      g.onerror = function () { reject(g.error); };
+    } catch (e) { reject(e); }
+  });
+}
+
+function idbPut(key, val) {
+  return new Promise(function (resolve, reject) {
+    if (!db) { reject(new Error('无数据库实例')); return; }
+    try {
+      var tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put(val, key);
+      tx.oncomplete = function () { resolve(true); };
+      tx.onerror = function () { reject(tx.error); };
+      tx.onabort = function () { reject(tx.error || new Error('事务中止')); };
+    } catch (e) { reject(e); }
+  });
+}
+
+/* 落库用的纯数据（去掉 nextAt 这类运行时字段） */
+function payload() {
+  return {
+    version: 2,
+    settings: data.settings,
+    jobs: data.jobs.map(function (j) {
+      return { id: j.id, label: j.label, rule: j.rule, audio: j.audio, enabled: j.enabled };
+    }),
+    lastEditAt: data.lastEditAt || 0,
+    lastExportAt: data.lastExportAt || 0
+  };
+}
+
+function saveLocal(p) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(p)); }
+  catch (e) { /* 配额满等情况，静默 */ }
+}
+
+/* 所有改动统一走这里；调用方不需要等待 */
+function saveData() {
+  var p = payload();
+  if (db) {
+    idbPut(DB_KEY, p).catch(function () {
+      storageMode = 'local';
+      saveLocal(p);
+      paintFoot();
+    });
+  } else {
+    saveLocal(p);
+  }
+}
+
+/* 导出用的纯数据 */
+function snapshot() {
+  return {
+    version: 1,
+    settings: data.settings,
+    jobs: data.jobs.map(function (j) {
+      return {
+        id: j.id,
+        label: j.label,
+        rule: j.rule,
+        audio: j.audio,
+        enabled: j.enabled
+      };
+    })
+  };
+}
+
+/* =====================================================================
+   调度
+   ===================================================================== */
+function refreshSchedule() {
+  var now = Date.now();
+  for (var i = 0; i < data.jobs.length; i++) {
+    var j = data.jobs[i];
+    j.nextAt = j.enabled ? nextAt(j.rule, now) : null;
+  }
+}
+
+/* 打开页面时，检查刚刚过去的一小段时间里有没有错过的提醒 */
+function checkMissedOnBoot() {
+  var now = Date.now();
+  var span = (data.settings.catchUpMin || 60) * 60000;
+  var missed = [];
+
+  for (var i = 0; i < data.jobs.length; i++) {
+    var j = data.jobs[i];
+    if (!j.enabled) continue;
+    var p = nextAt(j.rule, now - span);   // 这段时间里第一次触发点
+    if (p !== null && p <= now) {
+      missed.push({ job: j, at: p, missed: 1, late: now - p, onBoot: true });
+    }
+  }
+
+  if (missed.length) {
+    missed.sort(function (a, b) { return a.at - b.at; });
+    setTimeout(function () { if (!alarmOpen) fire(missed); }, 600);
+  }
+}
+
+function findJob(id) {
+  for (var i = 0; i < data.jobs.length; i++) if (data.jobs[i].id === id) return data.jobs[i];
+  return null;
+}
+
+function tick() {
+  tickTimer = null;
+  var now = Date.now();
+
+  if (isOwner) {
+    var due = [];
+    var catchLimit = (data.settings.catchUpMin || 60) * 60000;
+
+    for (var i = 0; i < data.jobs.length; i++) {
+      var j = data.jobs[i];
+      if (!j.enabled || !j.nextAt) continue;
+      if (j.nextAt > now) continue;
+
+      var first = j.nextAt;
+      var n = 0;
+      while (j.nextAt && j.nextAt <= now && n < 500) {
+        n++;
+        j.nextAt = nextAt(j.rule, j.nextAt);
+        if (j.rule.type === 'once') { j.enabled = false; break; }
+      }
+
+      // 错过太久就不打扰，静默顺延
+      if (now - first > catchLimit) continue;
+
+      due.push({ job: j, at: first, missed: n, late: now - first });
+    }
+
+    // 稍后再说
+    for (var k = snoozes.length - 1; k >= 0; k--) {
+      if (snoozes[k].at <= now) {
+        var job = findJob(snoozes[k].jobId);
+        if (job) due.push({ job: job, at: snoozes[k].at, missed: 0, late: 0, snooze: true });
+        snoozes.splice(k, 1);
+      }
+    }
+
+    if (due.length && !alarmOpen) fire(due);
+  }
+
+  paintClock();
+  paintNext();
+  paintOwnerHeartbeat();
+  tickTimer = setTimeout(tick, 1000);
+}
+
+function startTick() {
+  if (tickTimer) return;
+  tickTimer = setTimeout(tick, 200);
+}
+
+/* =====================================================================
+   触发提醒
+   ===================================================================== */
+function fire(dueList) {
+  alarmOpen = true;
+  alarms = dueList;
+
+  var first = dueList[0];
+  $('alarmLabel').textContent = first.job.label;
+
+  var timeText = fmtWhen(first.at);
+  $('alarmTime').textContent = '原定 ' + timeText;
+
+  var extra = '';
+  if (first.onBoot) {
+    extra = '页面刚打开，这条提醒 ' + Math.round(first.late / 60000) + ' 分钟前已到点';
+  } else if (first.late > 60000) {
+    extra = '晚了 ' + Math.round(first.late / 60000) + ' 分钟才提醒你';
+  }
+
+  var more = [];
+  for (var i = 1; i < dueList.length; i++) {
+    more.push(dueList[i].job.label + '（' + fmtWhen(dueList[i].at) + '）');
+  }
+  var missedCount = 0;
+  for (var m = 0; m < dueList.length; m++) if (dueList[m].missed > 1) missedCount += dueList[m].missed - 1;
+
+  if (missedCount > 0) extra += (extra ? '，' : '') + '另有 ' + missedCount + ' 次未提醒已跳过';
+  $('alarmExtra').textContent = extra;
+
+  if (more.length) {
+    $('alarmList').innerHTML = '同时到期：<br>' + more.map(function (x) { return esc(x); }).join('<br>');
+  } else {
+    $('alarmList').innerHTML = '';
+  }
+
+  $('alarmMask').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+
+  playAlarm(first.job);
+  notifyDesktop(first.job, extra);
+  startFlash(first.job.label);
+
+  // 没人理就响 2 分钟自动停，弹层和标题闪烁保留
+  if (autoStopTimer) clearTimeout(autoStopTimer);
+  autoStopTimer = setTimeout(function () { stopSound(); }, 2 * 60 * 1000);
+}
+
+function ackAll() {
+  if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
+  stopSound();
+  stopFlash();
+  $('alarmMask').classList.add('hidden');
+  document.body.style.overflow = '';
+  alarmOpen = false;
+  alarms = [];
+  paintNext();
+  saveData();
+}
+
+function snoozeAll() {
+  var mins = data.settings.snoozeMin || 5;
+  var at = Date.now() + mins * 60000;
+  for (var i = 0; i < alarms.length; i++) {
+    snoozes.push({ at: at, jobId: alarms[i].job.id });
+  }
+  ackAll();
+  toast('将在 ' + mins + ' 分钟后再次提醒');
+}
+
+/* =====================================================================
+   声音
+   ===================================================================== */
+function ensureCtx() {
+  if (!ctx) {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try {
+      ctx = new AC();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = data.settings.volume;
+      masterGain.connect(ctx.destination);
+    } catch (e) { ctx = null; return null; }
+  }
+  if (ctx.state === 'suspended' && ctx.resume) {
+    try { ctx.resume(); } catch (e) {}
+  }
+  return ctx;
+}
+
+/* 三声上行合成提示音 */
+function beepOnce() {
+  var c = ensureCtx();
+  if (!c) return;
+  var t0 = c.currentTime + 0.02;
+  var freqs = [880, 1046.5, 1318.5];
+  for (var i = 0; i < freqs.length; i++) {
+    (function (f, idx) {
+      var o = c.createOscillator();
+      var g = c.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      var st = t0 + idx * 0.17;
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(0.28, st + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.15);
+      o.connect(g);
+      g.connect(masterGain || c.destination);
+      o.start(st);
+      o.stop(st + 0.18);
+    })(freqs[i], i);
+  }
+}
+
+function startSynthLoop() {
+  if (synthTimer) return;
+  beepOnce();
+  synthTimer = setInterval(beepOnce, 2600);
+}
+
+function stopSound() {
+  if (alarmAudio) {
+    try { alarmAudio.pause(); alarmAudio.currentTime = 0; } catch (e) {}
+    alarmAudio = null;
+  }
+  if (synthTimer) { clearInterval(synthTimer); synthTimer = null; }
+}
+
+function playAlarm(job) {
+  stopSound();
+  if (!data.settings.soundOn) return;
+
+  var src = (job && job.audio) ? job.audio : '';
+
+  if (src) {
+    var a;
+    try {
+      a = new Audio(audioUrl(src));
+    } catch (e) { a = null; }
+
+    if (a) {
+      a.loop = true;
+      a.volume = Math.max(0, Math.min(1, data.settings.volume));
+      alarmAudio = a;
+
+      a.onerror = function () {
+        // 文件找不到或格式不支持，降级到合成音
+        if (alarmAudio === a) { alarmAudio = null; startSynthLoop(); }
+        markAudioMissing(job.id, src);
+      };
+
+      var p = a.play();
+      if (p && p.then) {
+        p.then(function () {
+          // 真的响出来了，说明自动播放是通的
+          if (audioBlocked) { audioBlocked = false; audioReady = true; paintStatus(); }
+        }).catch(function (err) {
+          // 只有「被自动播放策略拦截」才标记为声音未启用
+          if (err && err.name === 'NotAllowedError') {
+            if (alarmAudio === a) { alarmAudio = null; }
+            markAudioBlocked();
+            startSynthLoop();
+          }
+        });
+      }
+      return;
+    }
+  }
+
+  startSynthLoop();
+}
+
+var missingAudio = {};   // jobId -> 文件名
+function markAudioMissing(jobId, name) {
+  missingAudio[jobId] = name;
+  renderList();
+}
+
+function markAudioBlocked() {
+  audioBlocked = true;
+  audioReady = false;
+  paintStatus();
+}
+
+/* 解锁：必须在用户手势内调用 */
+function unlockAudio(silent) {
+  // 用一段静音 wav 触发一次媒体元素播放，给当前 document 打上激活标记
+  try {
+    ensureCtx();
+    var a = new Audio(SILENT_WAV);
+    a.volume = 0;
+    var p = a.play();
+    if (p && p.then) {
+      p.then(function () {
+        try { a.pause(); } catch (e) {}
+      }).catch(function () {});
+    }
+  } catch (e) {}
+
+  audioReady = true;
+  audioBlocked = false;
+  paintStatus();
+  if (!silent) toast('声音已启用');
+}
+
+/* 演示音（试听 / 无文件时的预览） */
+function previewSound(src) {
+  ensureCtx();
+  stopSound();
+  if (!src) { startSynthLoop(); setTimeout(stopSound, 2600); return; }
+
+  var a;
+  try { a = new Audio(audioUrl(src)); } catch (e) { toast('文件名不合法'); return; }
+  a.volume = Math.max(0, Math.min(1, data.settings.volume));
+  var p = a.play();
+  if (p && p.catch) {
+    p.catch(function () { toast('无法播放：文件不在同目录，或格式不支持'); });
+  }
+  a.onerror = function () { toast('找不到文件：' + src); };
+  setTimeout(function () { try { a.pause(); } catch (e) {} }, 8000);
+}
+
+/* =====================================================================
+   系统通知 / 标题闪烁
+   ===================================================================== */
+function canNotify() {
+  return location.protocol !== 'file:' && ('Notification' in window);
+}
+
+function askNotifyPermission() {
+  if (!canNotify()) return;
+  if (Notification.permission === 'default') {
+    try { Notification.requestPermission(); } catch (e) {}
+  }
+}
+
+function notifyDesktop(job, extra) {
+  if (!canNotify() || Notification.permission !== 'granted') return;
+  try {
+    var n = new Notification('提醒：' + job.label, {
+      body: extra || '',
+      tag: 'reminder-' + job.id,
+      requireInteraction: true
+    });
+    n.onclick = function () { window.focus(); n.close(); };
+  } catch (e) {}
+}
+
+function startFlash(text) {
+  if (flashTimer) clearInterval(flashTimer);
+  var on = false;
+  flashTimer = setInterval(function () {
+    document.title = on ? ('● ' + text) : origTitle;
+    on = !on;
+  }, 900);
+}
+
+function stopFlash() {
+  if (flashTimer) { clearInterval(flashTimer); flashTimer = null; }
+  document.title = origTitle;
+}
+
+/* =====================================================================
+   界面绘制
+   ===================================================================== */
+function paintClock() {
+  elClock.textContent = fmtClock(new Date());
+}
+
+function paintStatus() {
+  elStatus.className = 'status';
+
+  if (audioBlocked) {
+    elStatus.classList.add('bad');
+    elStatusText.textContent = '声音被浏览器拦截，点此重新启用';
+    elStatusTag.textContent = '需要点击';
+    return;
+  }
+
+  if (!audioReady) {
+    elStatus.classList.add('bad');
+    elStatusText.textContent = '声音未启用，点此启用（必须点一次）';
+    elStatusTag.textContent = '点击启用';
+    return;
+  }
+
+  elStatus.classList.add('ok');
+  var extra = canNotify() && Notification.permission === 'granted' ? ' · 系统通知已允许' : '';
+  elStatusText.textContent = '声音已就绪，正在后台守候' + extra;
+  elStatusTag.textContent = '守护中';
+}
+
+function paintNext() {
+  var now = Date.now();
+  var best = null;
+
+  for (var i = 0; i < data.jobs.length; i++) {
+    var j = data.jobs[i];
+    if (!j.enabled || !j.nextAt) continue;
+    if (!best || j.nextAt < best.nextAt) best = j;
+  }
+
+  if (!data.jobs.length) {
+    elNext.style.display = 'none';
+    return;
+  }
+  elNext.style.display = '';
+
+  if (!best) {
+    elNext.innerHTML = '所有提醒都已暂停';
+    return;
+  }
+
+  var lb = best.label.length > 14 ? best.label.slice(0, 14) + '…' : best.label;
+  elNext.innerHTML = '下一个：<b>' + esc(lb) + '</b> · ' + esc(fmtWhen(best.nextAt)) +
+    ' · <span class="cd">' + esc(fmtRemain(best.nextAt - now)) + '</span>';
+}
+
+function jobRowHtml(j) {
+  var off = !j.enabled ? ' off' : '';
+  var sub = describeRule(j.rule);
+
+  if (j.enabled && j.nextAt) {
+    if (j.rule.type !== 'once') sub += ' · 下次 ' + fmtWhen(j.nextAt);
+  } else if (!j.enabled) {
+    sub += j.rule.type === 'once' ? ' · 已完成' : ' · 已暂停';
+  }
+
+  if (j.audio) {
+    if (missingAudio[j.id]) {
+      sub += ' · <span class="warnText">音频 ' + esc(j.audio) + ' 缺失</span>';
+    } else {
+      sub += ' · 音频 ' + esc(j.audio);
+    }
+  }
+
+  return '' +
+    '<div class="item' + off + '" data-id="' + esc(j.id) + '">' +
+      '<div class="item-main">' +
+        '<div class="item-top"><span class="dot"></span>' +
+          '<span class="item-label">' + esc(j.label) + '</span></div>' +
+        '<div class="item-sub">' + sub + '</div>' +
+      '</div>' +
+      '<div class="item-ops">' +
+        '<button data-act="edit" data-id="' + esc(j.id) + '">编辑</button>' +
+        '<button data-act="toggle" data-id="' + esc(j.id) + '">' + (j.enabled ? '暂停' : '启用') + '</button>' +
+        '<button class="del" data-act="del" data-id="' + esc(j.id) + '">删除</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderList() {
+  if (!data.jobs.length) {
+    elList.innerHTML = '<div class="empty"><b>还没有任何提醒</b>' +
+      '点下面的「+ 添加提醒」开始。<br>' +
+      '记得先点一下顶部状态条启用声音。</div>';
+    return;
+  }
+
+  // 按下次触发时间排序，停用的沉底
+  var sorted = data.jobs.slice().sort(function (a, b) {
+    if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+    var na = a.nextAt || Infinity, nb = b.nextAt || Infinity;
+    return na - nb;
+  });
+
+  var html = '';
+  for (var i = 0; i < sorted.length; i++) html += jobRowHtml(sorted[i]);
+  elList.innerHTML = html;
+}
+
+function paintFoot() {
+  var src = storageMode === 'idb' ? '已存入浏览器数据库' : '已存入本地存储（降级）';
+  var parts = ['<span class="cfgname">' + src + '</span>', '共 ' + data.jobs.length + ' 条'];
+  if (data.lastEditAt && data.lastEditAt > (data.lastExportAt || 0)) {
+    parts.push('<span class="warnText">未备份</span>');
+  }
+  elFootInfo.innerHTML = parts.join(' · ');
+}
+
+/* =====================================================================
+   编辑对话框
+   ===================================================================== */
+function openEditor(job) {
+  editorJob = job || null;
+  $('editorTitle').textContent = job ? '编辑提醒' : '添加提醒';
+
+  // 星期选择器
+  var box = $('dowsBox');
+  if (!box.childNodes.length) {
+    var h = '';
+    for (var i = 0; i < 7; i++) {
+      h += '<label><input type="checkbox" value="' + i + '"><span>' + WEEK_CN[i] + '</span></label>';
+    }
+    box.innerHTML = h;
+  }
+
+  if (job) {
+    $('fLabel').value = job.label;
+    setEditorType(job.rule.type);
+
+    if (job.rule.type === 'once') {
+      var d = new Date(job.rule.at);
+      $('fDate').value = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+      $('fTime').value = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    } else {
+      $('fTime').value = pad2(job.rule.h) + ':' + pad2(job.rule.m);
+      if (job.rule.type === 'monthly') $('fDay').value = job.rule.day;
+      if (job.rule.type === 'weekly') {
+        var cbs = box.querySelectorAll('input');
+        for (var k = 0; k < cbs.length; k++) {
+          cbs[k].checked = job.rule.dows.indexOf(parseInt(cbs[k].value, 10)) >= 0;
+        }
+      }
+    }
+    $('fAudio').value = job.audio || '';
+  } else {
+    $('fLabel').value = '';
+    setEditorType('daily');
+    $('fTime').value = '09:00';
+    $('fDay').value = '15';
+    $('fAudio').value = '';
+
+    var today = new Date();
+    $('fDate').value = today.getFullYear() + '-' + pad2(today.getMonth() + 1) + '-' + pad2(today.getDate());
+
+    var cbs2 = box.querySelectorAll('input');
+    for (var m = 0; m < cbs2.length; m++) cbs2[m].checked = false;
+  }
+
+  $('editorMask').classList.remove('hidden');
+  setTimeout(function () { $('fLabel').focus(); }, 30);
+}
+
+function closeEditor() {
+  $('editorMask').classList.add('hidden');
+  editorJob = null;
+}
+
+function setEditorType(t) {
+  editorType = t;
+  var btns = $('segType').getElementsByTagName('button');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].className = btns[i].getAttribute('data-type') === t ? 'on' : '';
+  }
+  $('rowWeekly').style.display = t === 'weekly' ? '' : 'none';
+  $('rowMonthly').style.display = t === 'monthly' ? '' : 'none';
+  $('rowOnce').style.display = t === 'once' ? '' : 'none';
+}
+
+function saveEditor() {
+  var label = $('fLabel').value.trim();
+  if (!label) { toast('请填写提醒内容'); $('fLabel').focus(); return; }
+
+  var timeStr = $('fTime').value || '09:00';
+  var tp = timeStr.split(':');
+  var hh = parseInt(tp[0], 10), mm = parseInt(tp[1], 10);
+  if (isNaN(hh) || isNaN(mm)) { toast('时间格式不正确'); return; }
+
+  var rule;
+
+  if (editorType === 'once') {
+    var ds = $('fDate').value;
+    if (!ds) { toast('请选择日期'); return; }
+    var dp = ds.split('-');
+    var at = new Date(parseInt(dp[0], 10), parseInt(dp[1], 10) - 1, parseInt(dp[2], 10), hh, mm, 0, 0).getTime();
+    if (at <= Date.now()) {
+      if (!confirm('这个时间已经过去了，仍然保存吗？')) return;
+    }
+    rule = { type: 'once', at: at, h: hh, m: mm };
+  } else if (editorType === 'daily') {
+    rule = { type: 'daily', h: hh, m: mm };
+  } else if (editorType === 'weekly') {
+    var cbs = $('dowsBox').querySelectorAll('input');
+    var dows = [];
+    for (var i = 0; i < cbs.length; i++) if (cbs[i].checked) dows.push(parseInt(cbs[i].value, 10));
+    if (!dows.length) { toast('请至少选择一个星期几'); return; }
+    rule = { type: 'weekly', dows: dows, h: hh, m: mm };
+  } else {
+    var day = parseInt($('fDay').value, 10);
+    if (isNaN(day) || day < 1 || day > 31) { toast('日期需在 1–31 之间'); return; }
+    rule = { type: 'monthly', day: day, h: hh, m: mm, overflow: 'last' };
+  }
+
+  var audioName = $('fAudio').value.trim();
+
+  if (editorJob) {
+    editorJob.label = label;
+    editorJob.rule = rule;
+    editorJob.audio = audioName;
+    delete missingAudio[editorJob.id];
+  } else {
+    var job = {
+      id: 'j' + Math.random().toString(36).slice(2, 9),
+      label: label,
+      rule: rule,
+      audio: audioName,
+      enabled: true,
+      nextAt: null
+    };
+    data.jobs.push(job);
+  }
+
+  refreshSchedule();
+  data.lastEditAt = Date.now();
+  saveData();
+  renderList();
+  paintNext();
+  paintFoot();
+  closeEditor();
+  if (elBanner.getAttribute('data-role') === 'firstrun') {
+    elBanner.className = 'banner';
+    elBanner.innerHTML = '';
+    elBanner.removeAttribute('data-role');
+  }
+  toast('已保存');
+}
+
+/* =====================================================================
+   导入 / 导出
+   ===================================================================== */
+function download(filename, text, mime) {
+  var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+}
+
+function exportConfig() {
+  var snap = snapshot();
+  var body = JSON.stringify(snap, null, 2);
+
+  var content = '/* 提醒器配置备份\n' +
+    '   提醒内容平时保存在浏览器数据库里，这个文件只是备份/迁移用。\n' +
+    '   恢复方式：打开「提醒器.html」，点右下角「从文件导入」选择本文件。\n' +
+    '   注意：它不会自动覆盖页面里的配置。*/\n' +
+    'window.REMINDERS = ' + body + ';\n';
+
+  data.lastExportAt = Date.now();
+  saveData();
+  paintFoot();
+
+  download('config.txt', content, 'text/plain;charset=utf-8');
+  toast('已导出备份 config.txt');
+}
+
+function importFile(file) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var text = String(reader.result);
+      var i = text.indexOf('{');
+      var j = text.lastIndexOf('}');
+      if (i < 0 || j <= i) throw new Error('no json');
+      var obj = JSON.parse(text.slice(i, j + 1));
+
+      var imported = normalize(obj);
+      if (!imported.jobs.length) {
+        if (!confirm('这个文件里没有任何提醒，确定要导入并清空当前列表吗？')) return;
+      }
+
+      data = imported;
+      data.lastEditAt = Date.now();
+      data.lastExportAt = Date.now();
+      refreshSchedule();
+      saveData();
+      renderList();
+      paintNext();
+      paintFoot();
+      toast('已导入 ' + data.jobs.length + ' 条提醒');
+    } catch (e) {
+      toast('文件解析失败，请确认是 config.txt 备份文件');
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* =====================================================================
+   多标签页：localStorage 心跳选主
+   ===================================================================== */
+function readOwner() {
+  try { return JSON.parse(localStorage.getItem(OWNER_KEY) || 'null'); } catch (e) { return null; }
+}
+
+function writeOwner() {
+  try { localStorage.setItem(OWNER_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() })); } catch (e) {}
+}
+
+function clearOwner() {
+  var o = readOwner();
+  if (o && o.id === TAB_ID) {
+    try { localStorage.removeItem(OWNER_KEY); } catch (e) {}
+  }
+}
+
+function initOwner() {
+  // window.name 在同标签页刷新后保留，用来区分「自己刷新」和「另开一个标签页」
+  if (!window.name || window.name.indexOf('rmd_') !== 0) {
+    window.name = 'rmd_' + Math.random().toString(36).slice(2, 10);
+  }
+  TAB_ID = window.name.slice(4);
+
+  var o = readOwner();
+  var now = Date.now();
+
+  if (o && o.id !== TAB_ID && (now - o.ts) < 12000) {
+    isOwner = false;
+  } else {
+    isOwner = true;
+    writeOwner();
+  }
+  paintOwnerBanner();
+}
+
+function paintOwnerHeartbeat() {
+  if (!isOwner) {
+    var o = readOwner();
+    var now = Date.now();
+    if (!o || (now - o.ts) > 15000) {
+      isOwner = true;
+      writeOwner();
+      paintOwnerBanner();
+      toast('另一个标签页已关闭，本页已接管提醒');
+    }
+    return;
+  }
+  // 每 4 秒续期一次心跳，避免频繁写 localStorage
+  var t = Date.now();
+  if (!paintOwnerHeartbeat._last || t - paintOwnerHeartbeat._last > 4000) {
+    paintOwnerHeartbeat._last = t;
+    writeOwner();
+  }
+}
+
+function paintOwnerBanner() {
+  if (isOwner) {
+    elBanner.className = 'banner';
+    elBanner.innerHTML = '';
+    elBanner.removeAttribute('data-role');
+  } else {
+    elBanner.className = 'banner show';
+    elBanner.innerHTML = '另一个标签页正在负责提醒，本页不会重复响铃。' +
+      '<button id="btnTakeover">由本页接管</button>';
+    var b = $('btnTakeover');
+    if (b) {
+      b.onclick = function () {
+        isOwner = true;
+        writeOwner();
+        paintOwnerBanner();
+        startTick();
+        toast('本页已接管');
+      };
+    }
+  }
+}
+
+/* =====================================================================
+   事件绑定
+   ===================================================================== */
+function toast(msg) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'show';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function () { t.className = ''; }, 2600);
+}
+
+function bindEvents() {
+  // 任意首次点击都尝试解锁音频（用户手势）
+  document.addEventListener('pointerdown', function once() {
+    document.removeEventListener('pointerdown', once);
+    if (!audioReady) unlockAudio(true);
+  });
+
+  elStatus.addEventListener('click', function () {
+    unlockAudio(false);
+    askNotifyPermission();
+    startTick();
+  });
+
+  $('addBtn').addEventListener('click', function () { openEditor(null); });
+
+  elList.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!btn) return;
+    var act = btn.getAttribute('data-act');
+    var id = btn.getAttribute('data-id');
+    var job = findJob(id);
+    if (!job) return;
+
+    if (act === 'edit') {
+      openEditor(job);
+    } else if (act === 'toggle') {
+      job.enabled = !job.enabled;
+      refreshSchedule();
+      data.lastEditAt = Date.now();
+      saveData();
+      renderList();
+      paintNext();
+      paintFoot();
+    } else if (act === 'del') {
+      if (!confirm('删除「' + job.label + '」？')) return;
+      for (var i = 0; i < data.jobs.length; i++) {
+        if (data.jobs[i].id === id) { data.jobs.splice(i, 1); break; }
+      }
+      delete missingAudio[id];
+      data.lastEditAt = Date.now();
+      saveData();
+      renderList();
+      paintNext();
+      paintFoot();
+    }
+  });
+
+  // 编辑器
+  $('editorClose').addEventListener('click', closeEditor);
+  $('editorCancel').addEventListener('click', closeEditor);
+  $('editorSave').addEventListener('click', saveEditor);
+
+  var segBtns = $('segType').getElementsByTagName('button');
+  for (var i = 0; i < segBtns.length; i++) {
+    segBtns[i].addEventListener('click', function () {
+      setEditorType(this.getAttribute('data-type'));
+    });
+  }
+
+  $('btnPreview').addEventListener('click', function () {
+    previewSound($('fAudio').value.trim());
+  });
+
+  // 提醒弹层
+  $('btnAck').addEventListener('click', ackAll);
+  $('btnSnooze').addEventListener('click', snoozeAll);
+
+  // 导入导出
+  $('btnSave').addEventListener('click', exportConfig);
+  $('btnLoad').addEventListener('click', function () { $('fileInput').click(); });
+  $('fileInput').addEventListener('change', function () {
+    if (this.files && this.files[0]) importFile(this.files[0]);
+    this.value = '';
+  });
+
+  // 页面重新可见时停掉标题闪烁（提醒弹层还在，不需要再闪）
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && alarmOpen) stopFlash();
+  });
+
+  window.addEventListener('beforeunload', clearOwner);
+  window.addEventListener('pagehide', clearOwner);
+
+  // 键盘：Esc 关闭对话框
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if (!$('editorMask').classList.contains('hidden')) closeEditor();
+    }
+  });
+}
+
+/* =====================================================================
+   启动
+   ===================================================================== */
+async function boot() {
+  /* 1. 打开数据库；失败则降级到 localStorage */
+  try {
+    db = await openDBWithTimeout(3000);
+    storageMode = 'idb';
+  } catch (e) {
+    db = null;
+    storageMode = 'local';
+  }
+
+  /* 2. 读取：数据库 → 旧版 localStorage → config.txt → 空白 */
+  var stored = null;
+  if (db) {
+    try { stored = await idbGet(DB_KEY); } catch (e) { stored = null; }
+  }
+
+  var seededFrom = '';
+
+  if (stored && stored.jobs) {
+    data = normalize(stored);
+  } else {
+    var legacy = null;
+    try { legacy = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) { legacy = null; }
+
+    if (legacy && legacy.jobs) {
+      data = normalize(legacy);
+      seededFrom = 'local';
+      saveData();
+      if (db) { try { localStorage.removeItem(LS_KEY); } catch (e) {} }
+    } else if (window.REMINDERS) {
+      data = normalize(window.REMINDERS);
+      seededFrom = 'file';
+      saveData();
+    } else {
+      data = normalize(null);
+    }
+  }
+
+  refreshSchedule();
+
+  initOwner();
+  bindEvents();
+  renderList();
+  paintFoot();
+  paintClock();
+  paintNext();
+  paintStatus();
+
+  // 兜底：每 30 秒刷新一次列表里的「下次」文字
+  setInterval(function () {
+    renderList();
+    paintNext();
+  }, 30000);
+
+  startTick();
+
+  // 打开页面时，补一次刚刚错过的提醒
+  if (isOwner) checkMissedOnBoot();
+
+  /* 3. 提示条 */
+  if (!data.jobs.length) {
+    elBanner.className = 'banner show';
+    elBanner.setAttribute('data-role', 'firstrun');
+    elBanner.innerHTML = storageMode === 'idb'
+      ? '还没有提醒。点下面的「+ 添加提醒」开始，内容会自动存进这台电脑的浏览器数据库，不用管文件。'
+      : '还没有提醒。注意：浏览器数据库打不开，已降级用本地存储兜底，容量较小。';
+  } else if (seededFrom === 'file') {
+    elBanner.className = 'banner show';
+    elBanner.setAttribute('data-role', 'seeded');
+    elBanner.innerHTML = '已从同目录的 config.txt 读取 ' + data.jobs.length +
+      ' 条提醒，并存进浏览器数据库。之后以数据库里的内容为准。';
+  } else if (seededFrom === 'local') {
+    elBanner.className = 'banner show';
+    elBanner.setAttribute('data-role', 'migrated');
+    elBanner.innerHTML = '已把 ' + data.jobs.length + ' 条提醒从旧版本迁移到浏览器数据库。';
+  }
+
+  // 首屏提示声音需要点击（等其它提示先显示完）
+  if (!audioReady) {
+    setTimeout(function () {
+      if (!audioReady && !$('toast').className) toast('点一下顶部状态条启用声音');
+    }, 2500);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+
+})();
+</script>
+</body>
+</html>
