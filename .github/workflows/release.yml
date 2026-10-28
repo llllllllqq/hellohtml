@@ -16,7 +16,7 @@ jobs:
     uses: ./.github/workflows/test.yml
 
   publish:
-    name: Package and publish
+    name: Package HTML and publish
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -24,24 +24,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Package source
+      - name: Check tag matches the newest subproject version
+        run: |
+          # 每个页面的标题处都标着自己的版本号（如 v1.0.0），发布号取所有子项目的最大值。
+          grep -rhoE 'class="ver"[^>]*>v[0-9]+(\.[0-9]+)*' --include='*.html' . \
+            | sed -E 's/.*>v//' | sort -V -u > versions.txt
+          echo "各子项目版本：" && cat versions.txt
+          MAX="$(tail -n 1 versions.txt)"
+          echo "最高版本 v$MAX / 本次标签 ${GITHUB_REF_NAME}"
+          if [ "v$MAX" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::标签 ${GITHUB_REF_NAME} 与子项目最高版本 v$MAX 不一致，请改版本号或换个标签"
+            exit 1
+          fi
+
+      - name: Package HTML only
         run: |
           TAG="${GITHUB_REF_NAME}"
-          git archive --format=zip --prefix="hellohtml-${TAG}/" -o "hellohtml-${TAG}.zip" HEAD
-          ls -lh "hellohtml-${TAG}.zip"
+          ZIP="hellohtml-${TAG}-html.zip"
+          git archive --format=zip --prefix="hellohtml-${TAG}/" -o "$ZIP" HEAD -- '*.html'
+
+          EXPECTED="$(git ls-files '*.html' | wc -l)"
+          ACTUAL="$(python3 -c "import sys, zipfile; print(sum(1 for n in zipfile.ZipFile(sys.argv[1]).namelist() if n.endswith('.html')))" "$ZIP")"
+          echo "压缩包内 HTML：$ACTUAL / 仓库内 $EXPECTED"
+          if [ "$EXPECTED" -ne "$ACTUAL" ]; then
+            echo "::error::压缩包里的 HTML 数量与仓库不一致"
+            exit 1
+          fi
+          python3 -c "import sys, zipfile; [print(' ', n) for n in zipfile.ZipFile(sys.argv[1]).namelist()]" "$ZIP"
 
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          ZIP="hellohtml-${TAG}.zip"
+          ZIP="hellohtml-${TAG}-html.zip"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG 已存在，只更新附件（通常说明是手动发布的 release）"
             gh release upload "$TAG" "$ZIP" --clobber
           else
             gh release create "$TAG" "$ZIP" \
-              --title "$TAG" \
+              --title "hellohtml ${TAG}" \
               --generate-notes \
               --verify-tag
           fi
