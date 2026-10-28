@@ -104,7 +104,8 @@ test.describe('21点游戏 · 普通版 21.html', () => {
     const errors = await open(page, PAGE_21);
 
     await expect(page).toHaveTitle('学习版测试系统');
-    await expect(page.locator('h1')).toHaveText('学术能力测试 (Academic Test)');
+    await expect(page.locator('h1')).toContainText('学术能力测试 (Academic Test)');
+    await expect(page.locator('h1 .ver')).toHaveText(/^v\d+\.\d+\.\d+$/);
     await expect(page.locator('#balance')).toHaveText('1000');
     await expect(page.locator('#bet-amount')).toHaveValue('10');
     await expect(page.locator('#btn-start-test')).toBeEnabled();

@@ -44,6 +44,21 @@ test.describe('仓库结构自检', () => {
     }
   });
 
+  test('每个页面都在正文标注版本号，且 <title> 里不带版本号', () => {
+    for (const folder of subprojects()) {
+      const dir = path.join(ROOT, folder);
+      for (const page of fs.readdirSync(dir).filter((name) => name.endsWith('.html'))) {
+        const html = fs.readFileSync(path.join(dir, page), 'utf8');
+
+        const markers = html.match(/class="ver"[^>]*>v\d+\.\d+\.\d+</g) || [];
+        expect(markers, `${folder}/${page} 应该有且只有一个正文版本号`).toHaveLength(1);
+
+        const title = (html.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
+        expect(title, `${folder}/${page} 的 <title> 里不应带版本号`).not.toMatch(/v\d+\.\d+\.\d+/);
+      }
+    }
+  });
+
   test('根 README 的结构表列出了每个子项目', () => {
     const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
 

@@ -117,6 +117,10 @@ body.playing #word{ color:var(--fg); }
 body.ended{ background:var(--red); color:#fff; }
 body.ended #word{ color:#fff; }
 body.ended #hint{ color:#fff; opacity:.85; }
+.ver{
+  font-size:clamp(11px,3vw,14px); font-weight:600;
+  letter-spacing:.18em; opacity:.42; margin-top:-8px;
+}
 </style>
 </head>
 <body>
@@ -128,6 +132,7 @@ body.ended #hint{ color:#fff; opacity:.85; }
 
 <div id="intro">
   <h1>击鼓传花<span>DRUM &amp; FLOWER</span></h1>
+  <div class="ver">v1.0.0</div>
   <div class="flow">
     <span>咚</span><span class="arrow">→</span><span>传</span><span class="arrow">→</span><span class="stop">停！</span>
   </div>

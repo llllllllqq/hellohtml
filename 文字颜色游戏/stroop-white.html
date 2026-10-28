@@ -97,6 +97,10 @@ body{
   animation:breathe 1.8s ease-in-out infinite;
 }
 @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.ver{
+  font-size:clamp(10px,2.8vw,12.5px); font-weight:700;
+  letter-spacing:.2em; opacity:.38; margin-top:-8px;
+}
 </style>
 </head>
 <body>
@@ -105,6 +109,7 @@ body{
 
 <div id="intro">
   <h1>先认一下这 7 种颜色 <em>· 记住它们的名字</em></h1>
+  <div class="ver">v1.0.0</div>
   <div id="swatches"></div>
   <p class="rule">开始后：说出<b>字的颜色</b>，不是字的意思，或反过来<br>点击屏幕任意位置，换下一题</p>
   <div class="start">点击任意位置开始</div>
