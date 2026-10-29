@@ -662,6 +662,25 @@ test.describe('提醒器', () => {
     await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
   });
 
+  test('提醒弹出时标签页图标带红点，确认后恢复', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+
+    const idle = await page.locator('link[rel="icon"]').getAttribute('href');
+    expect(idle).toMatch(/^data:image\/png/);
+
+    await addJob(page, { label: '喝水' });
+    await page.clock.runFor(45_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+
+    const alerting = await page.locator('link[rel="icon"]').getAttribute('href');
+    expect(alerting).not.toBe(idle);
+
+    await page.locator('#btnAck').click();
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', idle);
+  });
+
   test('响铃最长时长到点后停止发声，弹层保留', async ({ page, isMobile }) => {
     test.skip(isMobile, '只在桌面端跑');
     // 数合成提示音产生的振荡器，判断声音有没有继续

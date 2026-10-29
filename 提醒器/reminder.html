@@ -193,7 +193,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
   <div class="app">
 
     <div class="hd">
-      <div class="hd-title">提醒器 <span class="ver">v1.1.1</span></div>
+      <div class="hd-title">提醒器 <span class="ver">v1.2.0</span></div>
       <div class="hd-time" id="clock">--:--:--</div>
     </div>
 
@@ -408,6 +408,7 @@ var autoStopTimer = null;
 var alarmStartedAt = 0;      // 本次响铃开始时间，用于响铃时长上限
 var flashTimer = null;
 var origTitle = document.title;
+var faviconLink = null;   // 动态的标签页图标，有提醒时带红点
 var tickTimer = null;
 var isOwner = false;
 var myOwnerTs = 0;      // 本页最后一次写 owner 的时间戳，用来判断是否被别人接管
@@ -871,6 +872,7 @@ function fire(dueList) {
   $('alarmMask').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 
+  paintFavicon(true);
   playAlarm(first.job);
   notifyDesktop(first.job, extra);
   startFlash(first.job.label);
@@ -883,6 +885,7 @@ function fire(dueList) {
 function ackAll() {
   if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
   alarmStartedAt = 0;
+  paintFavicon(false);
   stopSound();
   stopFlash();
   $('alarmMask').classList.add('hidden');
@@ -1096,6 +1099,57 @@ function startFlash(text) {
 function stopFlash() {
   if (flashTimer) { clearInterval(flashTimer); flashTimer = null; }
   document.title = origTitle;
+}
+
+/* =====================================================================
+   标签页图标：有提醒时右上角点一个红点
+   ===================================================================== */
+function faviconHref(alerting) {
+  var size = 64;
+  var c = document.createElement('canvas');
+  c.width = c.height = size;
+  var g = c.getContext('2d');
+  if (!g) return '';
+
+  // 圆角方块底（手写路径，不依赖 ctx.roundRect）
+  var r = 14, x = 4, y = 4, w = size - 8, h = size - 8;
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+  g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
+  g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
+  g.closePath();
+  g.fillStyle = '#1a6dd4';
+  g.fill();
+
+  // 白色小闹钟
+  g.strokeStyle = '#fff';
+  g.lineWidth = 5;
+  g.lineCap = 'round';
+  g.beginPath(); g.arc(32, 34, 15, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.moveTo(32, 34); g.lineTo(32, 25); g.stroke();
+  g.beginPath(); g.moveTo(32, 34); g.lineTo(39, 38); g.stroke();
+
+  if (alerting) {
+    g.beginPath(); g.arc(50, 14, 11, 0, Math.PI * 2);
+    g.fillStyle = '#fff'; g.fill();
+    g.beginPath(); g.arc(50, 14, 7.5, 0, Math.PI * 2);
+    g.fillStyle = '#c93838'; g.fill();
+  }
+
+  return c.toDataURL('image/png');
+}
+
+function paintFavicon(alerting) {
+  if (!faviconLink) {
+    faviconLink = document.createElement('link');
+    faviconLink.rel = 'icon';
+    faviconLink.type = 'image/png';
+    (document.head || document.documentElement).appendChild(faviconLink);
+  }
+  var href = faviconHref(alerting);
+  if (href && faviconLink.href !== href) faviconLink.href = href;
 }
 
 /* =====================================================================
@@ -1489,6 +1543,7 @@ function stepDown() {
     alarmOpen = false;
     alarms = [];
   }
+  paintFavicon(false);
   paintOwnerBanner();
   paintNext();
   toast('另一个标签页已接管提醒');
@@ -1826,6 +1881,7 @@ async function boot() {
   paintNext();
   paintStatus();
   applyVolume();
+  paintFavicon(false);
 
   // 兜底：每 30 秒刷新一次列表里的「下次」文字
   setInterval(function () {
