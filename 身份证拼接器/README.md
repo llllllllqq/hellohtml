@@ -49,4 +49,13 @@
 
 ## 浏览器兼容
 
-Chrome / Edge 80+、Firefox 74+、Safari 13.1+、iOS Safari 13.4+（依赖 `canvas.toBlob`、`FileReader`、`URL.createObjectURL`）。不支持 IE。
+| 浏览器 | 最低版本 | 卡在哪 |
+| --- | --- | --- |
+| Chrome / Edge | 76 | `Blob.arrayBuffer()`（76） |
+| Firefox | 69 | `Blob.arrayBuffer()`（69） |
+| Safari | 14 | `Blob.arrayBuffer()`（14） |
+| iOS Safari | 14.5 | 同样是 `Blob.arrayBuffer()`，iOS 上要 14.5 |
+
+`Blob.arrayBuffer()` 只在导出 PDF、把 JPEG 塞进 PDF 时用到；更老的浏览器「下载 JPG」仍然正常，只有 PDF 会提示处理失败。
+
+Firefox 未纳入 CI 测试矩阵，版本按特性支持情况推算；低于表中版本时页面可能仍能打开，但会出现排版错位或个别功能不可用。不支持 IE。

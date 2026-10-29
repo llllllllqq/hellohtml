@@ -68,4 +68,14 @@
 
 ## 浏览器兼容
 
-Chrome/Edge 80+、Firefox 74+、Safari 13.1+、iOS Safari 13.4+（依赖 ES2020 语法与 Pointer Events）。不支持 IE。
+两个页面用到的特性不同，版本要求也不一样：
+
+| 页面 | Chrome / Edge | Firefox | Safari | iOS Safari |
+| --- | --- | --- | --- | --- |
+| 音频版 | 84 | 74 | 14.1 | 14.5 |
+| 视频版 | 88 | 89 | 15 | 15 |
+
+- 音频版：flex `gap`（Chrome 84 / Safari 14.1）、可选链（Chrome 80 / Firefox 74）、`Blob.arrayBuffer()`（Safari 14）里最高的那个
+- 视频版多一条 `aspect-ratio`（Chrome 88 / Firefox 89 / Safari 15），用来锁住预览区的 16:9
+
+Firefox 未纳入 CI 测试矩阵，版本按特性支持情况推算；低于表中版本时页面可能仍能打开，但会出现排版错位或个别功能不可用。不支持 IE。

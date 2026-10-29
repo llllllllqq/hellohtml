@@ -49,4 +49,13 @@
 
 ## 浏览器兼容
 
-Chrome / Edge 74+、Firefox 75+、Safari 13.1+、iOS Safari 13.4+（依赖 WebAudio、CSS 变量、Web Animations）。不支持 IE。
+| 浏览器 | 最低版本 | 卡在哪 |
+| --- | --- | --- |
+| Chrome / Edge | 87 | 遮罩与背景层用的 `inset:0`（87）、flex `gap`（84） |
+| Firefox | 75 | `clamp()` / `min()`（75） |
+| Safari | 14.1 | `inset:0` 与 flex `gap`（14.1） |
+| iOS Safari | 14.5 | 同上 |
+
+昵称弹窗的毛玻璃（`backdrop-filter`）只影响观感：Firefox 103 以下、Safari 18 以下会退化成普通半透明底，不影响使用。
+
+Firefox 未纳入 CI 测试矩阵，版本按特性支持情况推算；低于表中版本时页面可能仍能打开，但会出现排版错位或个别功能不可用。不支持 IE。

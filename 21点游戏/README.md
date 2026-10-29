@@ -52,4 +52,11 @@
 
 ## 浏览器兼容
 
-Chrome / Edge 74+、Firefox 75+、Safari 13.1+、iOS Safari 13.4+。不支持 IE。
+两个版本的门槛差得比较多：
+
+| 版本 | Chrome / Edge | Firefox | Safari | iOS Safari | 卡在哪 |
+| --- | --- | --- | --- | --- | --- |
+| 普通版 `21.html` | 49 | 44 | 10 | 10 | `const/let`（49 / 44 / 10）、模板字符串（41 / 34 / 9.1） |
+| Plus 版 `21plus.html` | 84 | 63 | 14.1 | 14.5 | flex `gap`（Chrome 84 / Firefox 63 / Safari 14.1）、CSS 变量（49 / 31 / 9.1） |
+
+Firefox 未纳入 CI 测试矩阵，版本按特性支持情况推算；低于表中版本时页面可能仍能打开，但会出现排版错位或个别功能不可用。不支持 IE。

@@ -31,4 +31,13 @@
 
 ## 浏览器兼容
 
-Chrome / Edge 74+、Firefox 75+、Safari 13.1+、iOS Safari 13.4+（依赖 WebAudio 与 Pointer Events）。不支持 IE。
+| 浏览器 | 最低版本 | 卡在哪 |
+| --- | --- | --- |
+| Chrome / Edge | 87 | CSS `inset`（87）、flex `gap`（84）、`clamp()`（79） |
+| Firefox | 75 | CSS `min()` / `clamp()`（75） |
+| Safari | 14.1 | CSS `inset`、flex `gap`（14.1） |
+| iOS Safari | 14.5 | 同上（iOS 14.5 的 Safari 即 14.1） |
+
+开场说明卡用 `position:fixed; inset:0` 铺满全屏，所以 Safari 必须 14.1 以上；更老的版本遮罩会缩成一条。
+
+Firefox 未纳入 CI 测试矩阵，版本按特性支持情况推算；低于表中版本时页面可能仍能打开，但会出现排版错位或个别功能不可用。不支持 IE。

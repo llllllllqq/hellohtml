@@ -59,4 +59,13 @@
 
 ## 浏览器兼容
 
-Chrome / Edge 74+、Firefox 75+、Safari 13.1+、iOS Safari 13.4+（依赖 IndexedDB、Pointer Events 与 WebAudio）。不支持 IE。
+| 浏览器 | 最低版本 | 卡在哪 |
+| --- | --- | --- |
+| Chrome / Edge | 55 | `async/await`（55） |
+| Firefox | 52 | `async/await`（52） |
+| Safari | 10.1 | `async/await`（10.1） |
+| iOS Safari | 10.3 | 同上 |
+
+页面本身很朴素：IndexedDB、WebAudio、`Element.closest`（Safari 9.1）都远低于上表门槛，真正卡住下限的只是 `async/await`。
+
+Firefox 未纳入 CI 测试矩阵，版本按特性支持情况推算；低于表中版本时页面可能仍能打开，但会出现排版错位或个别功能不可用。不支持 IE。
