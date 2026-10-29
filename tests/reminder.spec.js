@@ -18,6 +18,39 @@ async function installClock(page, iso) {
   await page.clock.pauseAt(time);
 }
 
+/** 打开设置面板。 */
+async function openSettings(page) {
+  await page.locator('#btnSettings').click();
+  await expect(page.locator('#settingsMask')).not.toHaveClass(/hidden/);
+}
+
+/** 读 IndexedDB 里已落库的 settings：saveData() 是异步写，刷新前要等它写完。 */
+async function savedSettings(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const open = indexedDB.open('reminder_app', 1);
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const tx = db.transaction('kv', 'readonly');
+          const get = tx.objectStore('kv').get('config');
+          get.onerror = () => reject(get.error);
+          get.onsuccess = () => resolve(get.result && get.result.settings);
+        };
+      }),
+  );
+}
+
+/** 设置滑杆的值（range 输入不支持 fill，直接派发事件）。 */
+async function setRange(page, selector, value) {
+  await page.locator(selector).evaluate((el, v) => {
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
 /** 打开页面并等待首屏 boot 结束（状态条不再显示「正在检查…」）。 */
 async function openPage(page) {
   await page.goto(PAGE);
@@ -257,6 +290,32 @@ test.describe('提醒器', () => {
     await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
   });
 
+  test('稍后提醒会在列表上标记，到点后自动消失', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+    await addJob(page, { label: '喝水' });
+
+    await page.clock.runFor(45_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await page.locator('#btnSnooze').click();
+
+    // 列表上出现标记，「下一个」优先显示稍后提醒
+    await expect(page.locator('.snooze-tag')).toHaveText('稍后 09:05');
+    await expect(page.locator('#nextLine')).toContainText('稍后提醒');
+    await expect(page.locator('#nextLine')).toContainText('喝水');
+
+    // 到点再次弹出，标记消失
+    await page.clock.runFor(5 * 60_000 + 2_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('.snooze-tag')).toHaveCount(0);
+    await expect(page.locator('#nextLine')).toContainText('下一个');
+
+    await page.locator('#btnAck').click();
+    await expect(page.locator('.snooze-tag')).toHaveCount(0);
+  });
+
   test('打开页面时补提醒，并标注已晚几分钟', async ({ page, isMobile }) => {
     test.skip(isMobile, '只在桌面端跑');
     await installClock(page, '2026-03-10T08:00:00+08:00');
@@ -466,6 +525,173 @@ test.describe('提醒器', () => {
     await second.locator('#btnTakeover').click();
     await expect(second.locator('#banner')).toBeHidden();
     await expect(second.locator('#toast')).toHaveText('本页已接管');
+  });
+
+  test('设置面板回显当前值，保存后刷新仍在', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, BASE);
+    await openPage(page);
+    await openSettings(page);
+
+    await expect(page.locator('#setVolume')).toHaveValue('80');
+    await expect(page.locator('#setVolumeVal')).toHaveText('80%');
+    await expect(page.locator('#setRingMax')).toHaveValue('120');
+    await expect(page.locator('#setSnooze')).toHaveValue('5');
+    await expect(page.locator('#setCatchUp')).toHaveValue('60');
+
+    await setRange(page, '#setVolume', 35);
+    await expect(page.locator('#setVolumeVal')).toHaveText('35%');
+    await page.locator('#setSnooze').fill('10');
+    await page.locator('#settingsSave').click();
+
+    await expect(page.locator('#settingsMask')).toHaveClass(/hidden/);
+    await expect(page.locator('#toast')).toHaveText('设置已保存');
+    await expect(page.locator('#footInfo')).toContainText('未备份');
+    await expect.poll(async () => (await savedSettings(page)).volume).toBe(0.35);
+
+    await page.reload();
+    await expect(page.locator('#statusText')).not.toHaveText('正在检查声音状态…');
+    await openSettings(page);
+    await expect(page.locator('#setVolume')).toHaveValue('35');
+    await expect(page.locator('#setSnooze')).toHaveValue('10');
+  });
+
+  test('音量拖到 0 显示静音，并且能存下来', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, BASE);
+    await openPage(page);
+    await openSettings(page);
+
+    await setRange(page, '#setVolume', 0);
+    await expect(page.locator('#setVolumeVal')).toHaveText('静音');
+
+    await page.locator('#settingsSave').click();
+    await expect.poll(async () => (await savedSettings(page)).volume).toBe(0);
+    await page.reload();
+    await expect(page.locator('#statusText')).not.toHaveText('正在检查声音状态…');
+    await openSettings(page);
+
+    await expect(page.locator('#setVolume')).toHaveValue('0');
+    await expect(page.locator('#setVolumeVal')).toHaveText('静音');
+  });
+
+  test('「稍后再说」按设置里的分钟数再次提醒', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+
+    await openSettings(page);
+    await page.locator('#setSnooze').fill('1');
+    await page.locator('#settingsSave').click();
+
+    await addJob(page, { label: '喝水' });
+    await page.clock.runFor(45_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+
+    await page.locator('#btnSnooze').click();
+    await expect(page.locator('#toast')).toHaveText('将在 1 分钟后再次提醒');
+
+    await page.clock.runFor(50_000);
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+
+    await page.clock.runFor(20_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
+  });
+
+  test('关掉提示音后，到点仍然弹出提醒', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+
+    await openSettings(page);
+    await page.locator('#setSoundSeg button[data-sound="off"]').click();
+    await page.locator('#settingsSave').click();
+    await addJob(page, { label: '喝水' });
+
+    await page.clock.runFor(45_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
+  });
+
+  test('补提醒窗口设为 0 后，重开页面不再补弹', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:00:00+08:00');
+    await openPage(page);
+
+    await importJobs(page, [
+      { id: 'd1', label: '吃降压药', rule: { type: 'daily', h: 9, m: 0 }, enabled: true },
+    ]);
+
+    await openSettings(page);
+    await page.locator('#setCatchUp').fill('0');
+    await page.locator('#settingsSave').click();
+    await expect.poll(async () => (await savedSettings(page)).catchUpMin).toBe(0);
+
+    await page.clock.setSystemTime(new Date('2026-03-10T09:05:00+08:00'));
+    await page.reload();
+    await expect(page.locator('#statusText')).not.toHaveText('正在检查声音状态…');
+    await page.clock.runFor(1_000);
+
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+  });
+
+  test('响铃最长时长到点后停止发声，弹层保留', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    // 数合成提示音产生的振荡器，判断声音有没有继续
+    await page.addInitScript(() => {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      window.__osc = 0;
+      if (AC && AC.prototype && AC.prototype.createOscillator) {
+        const orig = AC.prototype.createOscillator;
+        AC.prototype.createOscillator = function () {
+          window.__osc += 1;
+          return orig.apply(this, arguments);
+        };
+      }
+    });
+
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+
+    await openSettings(page);
+    await page.locator('#setRingMax').fill('5');
+    await page.locator('#settingsSave').click();
+
+    await addJob(page, { label: '喝水' });
+    await page.clock.runFor(45_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+
+    await page.clock.runFor(6_000);
+    const atStop = await page.evaluate(() => window.__osc);
+    expect(atStop).toBeGreaterThan(0);
+
+    await page.clock.runFor(20_000);
+    expect(await page.evaluate(() => window.__osc)).toBe(atStop);
+    // 声音停了，但弹层还在等确认
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+  });
+
+  test('导出的备份里带上设置', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, BASE);
+    await openPage(page);
+    await openSettings(page);
+    await setRange(page, '#setVolume', 40);
+    await page.locator('#setRingMax').fill('30');
+    await page.locator('#settingsSave').click();
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.locator('#btnSave').click(),
+    ]);
+
+    const text = fs.readFileSync(await download.path(), 'utf8');
+    const json = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+    expect(json.settings).toMatchObject({ volume: 0.4, ringMaxSec: 30 });
   });
 
   test('移动端：编辑器与列表在窄屏可用且不溢出', async ({ page, isMobile }) => {

@@ -70,6 +70,9 @@ input[type=number]{-moz-appearance:textfield;}
 .item-sub{font-size:12.5px;color:var(--t3);padding-left:16px;line-height:1.6;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-wrap:break-word;}
 .item-sub .warnText{color:var(--dan);}
+.snooze-tag{flex:none;margin-left:8px;margin-top:3px;font-size:11px;line-height:1.6;
+  color:var(--warn);background:var(--warnBg);border:1px solid var(--warnLine);
+  border-radius:4px;padding:0 6px;white-space:nowrap;}
 .item-ops{display:flex;flex:none;padding-left:12px;}
 .item-ops button{font-size:12.5px;padding:3px 10px;border-radius:4px;border:1px solid var(--line);color:var(--t2);margin-left:6px;white-space:nowrap;}
 .item-ops button:hover{background:#f7f8f9;}
@@ -134,6 +137,17 @@ input[type=number]{-moz-appearance:textfield;}
   font-size:12.5px;color:var(--t2);border:1px solid var(--line);border-radius:6px;cursor:pointer;}
 .dows input:checked + span{background:var(--priBg);color:var(--pri);border-color:var(--priLine);font-weight:500;}
 
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;
+  background:var(--line);outline:none;margin:15px 0;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+  width:18px;height:18px;border-radius:50%;background:var(--pri);border:2px solid #fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
+  background:var(--pri);border:2px solid #fff;cursor:pointer;}
+.rangeVal{width:52px;text-align:right;flex:none;font-size:13px;color:var(--t2);
+  font-variant-numeric:tabular-nums;}
+.unit{flex:none;line-height:36px;font-size:13px;color:var(--t3);}
+
 .btn{display:inline-block;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:500;text-align:center;}
 .btn.pri{background:var(--pri);color:#fff;}
 .btn.pri:hover{background:#1560bd;}
@@ -179,7 +193,7 @@ input[type=number]{-moz-appearance:textfield;}
   <div class="app">
 
     <div class="hd">
-      <div class="hd-title">提醒器 <span class="ver">v1.0.0</span></div>
+      <div class="hd-title">提醒器 <span class="ver">v1.1.0</span></div>
       <div class="hd-time" id="clock">--:--:--</div>
     </div>
 
@@ -201,6 +215,7 @@ input[type=number]{-moz-appearance:textfield;}
     <div class="foot">
       <span id="footInfo"></span>
       <span class="links">
+        <button class="link" id="btnSettings">⚙ 设置</button>
         <button class="link" id="btnSave">导出备份</button>
         <button class="link" id="btnLoad">从备份导入</button>
       </span>
@@ -276,6 +291,66 @@ input[type=number]{-moz-appearance:textfield;}
   </div>
 </div>
 
+<!-- 设置面板 -->
+<div class="mask hidden" id="settingsMask">
+  <div class="dialog">
+    <div class="dlg-hd">
+      <h3>设置</h3>
+      <button class="x" id="settingsClose">×</button>
+    </div>
+    <div class="dlg-bd">
+
+      <div class="field">
+        <label>默认音量</label>
+        <div class="row" style="align-items:center">
+          <input type="range" id="setVolume" min="0" max="100" step="5" class="grow">
+          <span class="rangeVal" id="setVolumeVal">80%</span>
+        </div>
+        <div class="hintline">拖动滑杆即时生效，松手试听一声；0% 等于静音。</div>
+      </div>
+
+      <div class="field">
+        <label>提示音</label>
+        <div class="seg" id="setSoundSeg">
+          <button data-sound="on" class="on">开</button>
+          <button data-sound="off">关</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>响铃最长时长</label>
+        <div class="row" style="align-items:center">
+          <input type="number" id="setRingMax" min="5" max="600" step="5" value="120" class="grow">
+          <span class="unit">秒</span>
+        </div>
+        <div class="hintline">到点自动静音（弹层保留）。提示音文件比这个长时只播前这么多秒，比它短则循环播放。</div>
+      </div>
+
+      <div class="field">
+        <label>稍后再说</label>
+        <div class="row" style="align-items:center">
+          <input type="number" id="setSnooze" min="1" max="60" value="5" class="grow">
+          <span class="unit">分钟</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>错过补提醒</label>
+        <div class="row" style="align-items:center">
+          <input type="number" id="setCatchUp" min="0" max="180" value="60" class="grow">
+          <span class="unit">分钟</span>
+        </div>
+        <div class="hintline">重新打开页面时，补提醒这么久以内错过的提醒；0 表示不补。</div>
+      </div>
+
+    </div>
+    <div class="dlg-ft">
+      <button class="btn ghost" id="settingsCancel" style="margin-left:0;margin-right:10px;">取消</button>
+      <button class="btn pri" id="settingsSave">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 提醒弹层 -->
 <div class="mask hidden alarm" id="alarmMask">
   <div class="dialog">
@@ -299,7 +374,7 @@ input[type=number]{-moz-appearance:textfield;}
 <script>
 /* =====================================================================
    提醒器 — 单文件离线版
-   运行环境：双击打开（file://），Chrome 74+
+   运行环境：双击打开（file://），兼容版本见 README 的「浏览器兼容」
    配置存储：浏览器 IndexedDB（config.txt 仅作备份，可导入导出）
    音频文件：同目录相对路径
    ===================================================================== */
@@ -330,6 +405,7 @@ var masterGain = null;
 var alarmAudio = null;
 var synthTimer = null;
 var autoStopTimer = null;
+var alarmStartedAt = 0;      // 本次响铃开始时间，用于响铃时长上限
 var flashTimer = null;
 var origTitle = document.title;
 var tickTimer = null;
@@ -481,7 +557,7 @@ function describeRule(rule) {
    数据：规范化 / 读写
    ===================================================================== */
 function defaultSettings() {
-  return { volume: 0.8, soundOn: true, snoozeMin: 5, catchUpMin: 60 };
+  return { volume: 0.8, soundOn: true, snoozeMin: 5, catchUpMin: 60, ringMaxSec: 120 };
 }
 
 function normalize(raw) {
@@ -499,8 +575,9 @@ function normalize(raw) {
     var s = raw.settings;
     if (typeof s.volume === 'number') out.settings.volume = Math.max(0, Math.min(1, s.volume));
     if (typeof s.soundOn === 'boolean') out.settings.soundOn = s.soundOn;
-    if (typeof s.snoozeMin === 'number') out.settings.snoozeMin = s.snoozeMin;
-    if (typeof s.catchUpMin === 'number') out.settings.catchUpMin = s.catchUpMin;
+    if (typeof s.snoozeMin === 'number') out.settings.snoozeMin = clampRange(s.snoozeMin, 1, 60);
+    if (typeof s.catchUpMin === 'number') out.settings.catchUpMin = clampRange(s.catchUpMin, 0, 180);
+    if (typeof s.ringMaxSec === 'number') out.settings.ringMaxSec = clampRange(s.ringMaxSec, 5, 600);
   }
 
   if (typeof raw.lastEditAt === 'number') out.lastEditAt = raw.lastEditAt;
@@ -675,7 +752,7 @@ function refreshSchedule() {
 /* 打开页面时，检查刚刚过去的一小段时间里有没有错过的提醒 */
 function checkMissedOnBoot() {
   var now = Date.now();
-  var span = (data.settings.catchUpMin || 60) * 60000;
+  var span = catchUpSpanMs();
   var missed = [];
 
   for (var i = 0; i < data.jobs.length; i++) {
@@ -704,7 +781,7 @@ function tick() {
 
   if (isOwner) {
     var due = [];
-    var catchLimit = (data.settings.catchUpMin || 60) * 60000;
+    var catchLimit = catchUpSpanMs();
 
     for (var i = 0; i < data.jobs.length; i++) {
       var j = data.jobs[i];
@@ -726,13 +803,16 @@ function tick() {
     }
 
     // 稍后再说
+    var snoozeFired = false;
     for (var k = snoozes.length - 1; k >= 0; k--) {
       if (snoozes[k].at <= now) {
         var job = findJob(snoozes[k].jobId);
         if (job) due.push({ job: job, at: snoozes[k].at, missed: 0, late: 0, snooze: true });
         snoozes.splice(k, 1);
+        snoozeFired = true;
       }
     }
+    if (snoozeFired) renderList();
 
     if (due.length && !alarmOpen) fire(due);
   }
@@ -791,13 +871,14 @@ function fire(dueList) {
   notifyDesktop(first.job, extra);
   startFlash(first.job.label);
 
-  // 没人理就响 2 分钟自动停，弹层和标题闪烁保留
-  if (autoStopTimer) clearTimeout(autoStopTimer);
-  autoStopTimer = setTimeout(function () { stopSound(); }, 2 * 60 * 1000);
+  // 响了设定时长就自动静音，弹层和标题闪烁保留
+  alarmStartedAt = Date.now();
+  rearmAutoStop();
 }
 
 function ackAll() {
   if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
+  alarmStartedAt = 0;
   stopSound();
   stopFlash();
   $('alarmMask').classList.add('hidden');
@@ -815,6 +896,8 @@ function snoozeAll() {
     snoozes.push({ at: at, jobId: alarms[i].job.id });
   }
   ackAll();
+  renderList();
+  paintNext();
   toast('将在 ' + mins + ' 分钟后再次提醒');
 }
 
@@ -967,7 +1050,8 @@ function previewSound(src) {
     p.catch(function () { toast('无法播放：文件不在同目录，或格式不支持'); });
   }
   a.onerror = function () { toast('找不到文件：' + src); };
-  setTimeout(function () { try { a.pause(); } catch (e) {} }, 8000);
+  var capMs = Math.max(1000, Math.min(8000, clampRange(data.settings.ringMaxSec, 5, 600, 120) * 1000));
+  setTimeout(function () { try { a.pause(); } catch (e) {} }, capMs);
 }
 
 /* =====================================================================
@@ -1056,6 +1140,20 @@ function paintNext() {
   }
   elNext.style.display = '';
 
+  // 挂着的「稍后提醒」可能比下一次常规时间更早，优先展示
+  var sn = null;
+  for (var s = 0; s < snoozes.length; s++) {
+    if (sn && snoozes[s].at >= sn.at) continue;
+    var sj = findJob(snoozes[s].jobId);
+    if (sj) sn = { job: sj, at: snoozes[s].at };
+  }
+  if (sn && (!best || sn.at < best.nextAt)) {
+    var snLabel = sn.job.label.length > 14 ? sn.job.label.slice(0, 14) + '…' : sn.job.label;
+    elNext.innerHTML = '稍后提醒：<b>' + esc(snLabel) + '</b> · ' + esc(fmtWhen(sn.at)) +
+      ' · <span class="cd">' + esc(fmtRemain(sn.at - now)) + '</span>';
+    return;
+  }
+
   if (!best) {
     elNext.innerHTML = '所有提醒都已暂停';
     return;
@@ -1064,6 +1162,22 @@ function paintNext() {
   var lb = best.label.length > 14 ? best.label.slice(0, 14) + '…' : best.label;
   elNext.innerHTML = '下一个：<b>' + esc(lb) + '</b> · ' + esc(fmtWhen(best.nextAt)) +
     ' · <span class="cd">' + esc(fmtRemain(best.nextAt - now)) + '</span>';
+}
+
+/** 这条提醒当前挂着的「稍后再说」，没有则返回 null。 */
+function snoozeOf(jobId) {
+  for (var i = 0; i < snoozes.length; i++) {
+    if (snoozes[i].jobId === jobId) return snoozes[i];
+  }
+  return null;
+}
+
+function snoozeTagHtml(j) {
+  var sn = snoozeOf(j.id);
+  if (!sn) return '';
+  var d = new Date(sn.at);
+  var hm = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  return '<span class="snooze-tag" title="已稍后提醒，' + esc(fmtWhen(sn.at)) + ' 再响">稍后 ' + hm + '</span>';
 }
 
 function jobRowHtml(j) {
@@ -1088,7 +1202,7 @@ function jobRowHtml(j) {
     '<div class="item' + off + '" data-id="' + esc(j.id) + '">' +
       '<div class="item-main">' +
         '<div class="item-top"><span class="dot"></span>' +
-          '<span class="item-label">' + esc(j.label) + '</span></div>' +
+          '<span class="item-label">' + esc(j.label) + '</span>' + snoozeTagHtml(j) + '</div>' +
         '<div class="item-sub">' + sub + '</div>' +
       '</div>' +
       '<div class="item-ops">' +
@@ -1318,6 +1432,7 @@ function importFile(file) {
       data.lastEditAt = Date.now();
       data.lastExportAt = Date.now();
       refreshSchedule();
+      applyVolume();
       saveData();
       renderList();
       paintNext();
@@ -1410,6 +1525,89 @@ function paintOwnerBanner() {
 }
 
 /* =====================================================================
+   设置
+   ===================================================================== */
+var soundDraft = true;
+
+function clampRange(v, lo, hi, dflt) {
+  v = parseInt(v, 10);
+  if (isNaN(v)) return dflt === undefined ? lo : dflt;
+  return Math.max(lo, Math.min(hi, v));
+}
+
+/* 改音量立即生效：合成音走 masterGain，自定义音频走元素自身的 volume */
+function applyGain(v) {
+  v = Math.max(0, Math.min(1, Number(v) || 0));
+  if (masterGain) masterGain.gain.value = v;
+  if (alarmAudio) alarmAudio.volume = v;
+}
+
+function applyVolume() { applyGain(data.settings.volume); }
+
+/* 错过补提醒的时间窗（毫秒）；0 表示不补，注意不能用 `|| 60` 否则 0 会被当成默认值 */
+function catchUpSpanMs() {
+  var m = data.settings.catchUpMin;
+  if (m === undefined || m === null) m = 60;
+  return Math.max(0, m) * 60000;
+}
+
+/* 响铃时长上限：到点只停声音，弹层和标题闪烁保留 */
+function rearmAutoStop() {
+  if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
+  if (!alarmOpen || !alarmStartedAt) return;
+
+  var maxSec = clampRange(data.settings.ringMaxSec, 5, 600, 120);
+  var left = alarmStartedAt + maxSec * 1000 - Date.now();
+  if (left <= 0) { stopSound(); return; }
+  autoStopTimer = setTimeout(function () { stopSound(); }, left);
+}
+
+function paintVolumeValue() {
+  var v = parseInt($('setVolume').value, 10) || 0;
+  $('setVolumeVal').textContent = v === 0 ? '静音' : v + '%';
+}
+
+function setSoundDraft(on) {
+  soundDraft = on;
+  var btns = $('setSoundSeg').getElementsByTagName('button');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].className = (btns[i].getAttribute('data-sound') === 'on') === on ? 'on' : '';
+  }
+}
+
+function openSettings() {
+  soundDraft = data.settings.soundOn !== false;
+  $('setVolume').value = Math.round((data.settings.volume || 0) * 100);
+  paintVolumeValue();
+  setSoundDraft(soundDraft);
+  $('setRingMax').value = data.settings.ringMaxSec || 120;
+  $('setSnooze').value = data.settings.snoozeMin || 5;
+  $('setCatchUp').value = data.settings.catchUpMin === 0 ? 0 : (data.settings.catchUpMin || 60);
+  $('settingsMask').classList.remove('hidden');
+}
+
+function closeSettings() {
+  $('settingsMask').classList.add('hidden');
+  applyVolume();          // 取消时把试听改过的音量还原成已保存的值
+}
+
+function saveSettings() {
+  data.settings.volume = Math.max(0, Math.min(100, parseInt($('setVolume').value, 10) || 0)) / 100;
+  data.settings.soundOn = soundDraft;
+  data.settings.ringMaxSec = clampRange($('setRingMax').value, 5, 600, 120);
+  data.settings.snoozeMin = clampRange($('setSnooze').value, 1, 60, 5);
+  data.settings.catchUpMin = clampRange($('setCatchUp').value, 0, 180, 60);
+
+  data.lastEditAt = Date.now();
+  applyVolume();
+  rearmAutoStop();        // 正在响铃时按新时长重新计时
+  saveData();
+  paintFoot();
+  $('settingsMask').classList.add('hidden');
+  toast('设置已保存');
+}
+
+/* =====================================================================
    事件绑定
    ===================================================================== */
 function toast(msg) {
@@ -1459,6 +1657,9 @@ function bindEvents() {
         if (data.jobs[i].id === id) { data.jobs.splice(i, 1); break; }
       }
       delete missingAudio[id];
+      for (var q = snoozes.length - 1; q >= 0; q--) {
+        if (snoozes[q].jobId === id) snoozes.splice(q, 1);
+      }
       data.lastEditAt = Date.now();
       saveData();
       renderList();
@@ -1487,6 +1688,30 @@ function bindEvents() {
   $('btnAck').addEventListener('click', ackAll);
   $('btnSnooze').addEventListener('click', snoozeAll);
 
+  // 设置
+  $('btnSettings').addEventListener('click', openSettings);
+  $('settingsClose').addEventListener('click', closeSettings);
+  $('settingsCancel').addEventListener('click', closeSettings);
+  $('settingsSave').addEventListener('click', saveSettings);
+
+  $('setVolume').addEventListener('input', function () {
+    paintVolumeValue();
+    applyGain((parseInt(this.value, 10) || 0) / 100);   // 拖动时实时改音量
+  });
+  $('setVolume').addEventListener('change', function () {
+    if (!soundDraft) { toast('提示音已关闭，先打开再试听'); return; }
+    ensureCtx();
+    beepOnce();                                          // 松手试听一声
+  });
+
+  var soundBtns = $('setSoundSeg').getElementsByTagName('button');
+  for (var k = 0; k < soundBtns.length; k++) {
+    soundBtns[k].addEventListener('click', function () {
+      setSoundDraft(this.getAttribute('data-sound') === 'on');
+      if (soundDraft) { ensureCtx(); beepOnce(); }
+    });
+  }
+
   // 导入导出
   $('btnSave').addEventListener('click', exportConfig);
   $('btnLoad').addEventListener('click', function () { $('fileInput').click(); });
@@ -1507,6 +1732,7 @@ function bindEvents() {
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       if (!$('editorMask').classList.contains('hidden')) closeEditor();
+      else if (!$('settingsMask').classList.contains('hidden')) closeSettings();
     }
   });
 }
@@ -1561,6 +1787,7 @@ async function boot() {
   paintClock();
   paintNext();
   paintStatus();
+  applyVolume();
 
   // 兜底：每 30 秒刷新一次列表里的「下次」文字
   setInterval(function () {
