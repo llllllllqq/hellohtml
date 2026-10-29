@@ -193,7 +193,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
   <div class="app">
 
     <div class="hd">
-      <div class="hd-title">提醒器 <span class="ver">v1.1.0</span></div>
+      <div class="hd-title">提醒器 <span class="ver">v1.1.1</span></div>
       <div class="hd-time" id="clock">--:--:--</div>
     </div>
 
@@ -410,6 +410,7 @@ var flashTimer = null;
 var origTitle = document.title;
 var tickTimer = null;
 var isOwner = false;
+var myOwnerTs = 0;      // 本页最后一次写 owner 的时间戳，用来判断是否被别人接管
 var TAB_ID = '';
 
 /* ---------- DOM ---------- */
@@ -778,6 +779,9 @@ function findJob(id) {
 function tick() {
   tickTimer = null;
   var now = Date.now();
+
+  // 被别的标签页接管了（手动或它的心跳更新），立刻停手，避免两个页面同时响
+  if (isOwner && takenOverByOther()) stepDown();
 
   if (isOwner) {
     var due = [];
@@ -1453,7 +1457,41 @@ function readOwner() {
 }
 
 function writeOwner() {
-  try { localStorage.setItem(OWNER_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() })); } catch (e) {}
+  var ts = Date.now();
+  var o = readOwner();
+  // 接管时让时间戳严格新于上一任，避免同一毫秒写入分不出先后
+  if (o && typeof o.ts === 'number' && o.ts >= ts) ts = o.ts + 1;
+  myOwnerTs = ts;
+  try { localStorage.setItem(OWNER_KEY, JSON.stringify({ id: TAB_ID, ts: ts })); } catch (e) {}
+}
+
+/* 别的标签页是否已经接管：它的心跳时间戳比本页最后一次写入更新 */
+function takenOverByOther() {
+  var o = readOwner();
+  if (!o || o.id === TAB_ID) return false;
+  if (typeof o.ts !== 'number') return false;
+  if (o.ts > myOwnerTs) return true;
+  // 极端情况（同一毫秒写入）：让 id 较大的那页退让，保证只留一个
+  return o.ts === myOwnerTs && String(TAB_ID) > String(o.id);
+}
+
+/* 让出控制权：停声音、收起弹层，之后不再触发提醒 */
+function stepDown() {
+  isOwner = false;
+  myOwnerTs = 0;
+  if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
+  alarmStartedAt = 0;
+  stopSound();
+  stopFlash();
+  if (alarmOpen) {
+    $('alarmMask').classList.add('hidden');
+    document.body.style.overflow = '';
+    alarmOpen = false;
+    alarms = [];
+  }
+  paintOwnerBanner();
+  paintNext();
+  toast('另一个标签页已接管提醒');
 }
 
 function clearOwner() {

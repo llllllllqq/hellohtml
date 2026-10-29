@@ -24,8 +24,8 @@ async function openSettings(page) {
   await expect(page.locator('#settingsMask')).not.toHaveClass(/hidden/);
 }
 
-/** 读 IndexedDB 里已落库的 settings：saveData() 是异步写，刷新前要等它写完。 */
-async function savedSettings(page) {
+/** 读 IndexedDB 里已落库的配置：saveData() 是异步写，依赖它的断言要先等写完。 */
+async function storedConfig(page) {
   return page.evaluate(
     () =>
       new Promise((resolve, reject) => {
@@ -36,10 +36,34 @@ async function savedSettings(page) {
           const tx = db.transaction('kv', 'readonly');
           const get = tx.objectStore('kv').get('config');
           get.onerror = () => reject(get.error);
-          get.onsuccess = () => resolve(get.result && get.result.settings);
+          get.onsuccess = () => resolve(get.result || null);
         };
       }),
   );
+}
+
+async function savedSettings(page) {
+  const config = await storedConfig(page);
+  return (config && config.settings) || {};
+}
+
+/** 在同一个浏览器上下文里再开一个标签页（独立假时钟）。 */
+async function openSecondTab(context, time) {
+  const second = await context.newPage();
+  const at = new Date(time);
+  await second.clock.install({ time: at });
+  await second.clock.pauseAt(at);
+  await second.goto(PAGE);
+  await expect(second.locator('#statusText')).not.toHaveText('正在检查声音状态…');
+  return second;
+}
+
+/** 两个标签页的假时钟同步往前走，模拟两个页面同时活着。 */
+async function runBothTabs(a, b, ms, step = 1_000) {
+  for (let elapsed = 0; elapsed < ms; elapsed += step) {
+    await a.clock.runFor(step);
+    await b.clock.runFor(step);
+  }
 }
 
 /** 设置滑杆的值（range 输入不支持 fill，直接派发事件）。 */
@@ -692,6 +716,46 @@ test.describe('提醒器', () => {
     const text = fs.readFileSync(await download.path(), 'utf8');
     const json = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
     expect(json.settings).toMatchObject({ volume: 0.4, ringMaxSec: 30 });
+  });
+
+  test('手动接管后，原来的页面不再响铃', async ({ page, context, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    const T = '2026-03-10T08:59:30+08:00';
+    await installClock(page, T);
+    await openPage(page);
+    await addJob(page, { label: '喝水' });
+    await expect.poll(async () => (await storedConfig(page)).jobs.length).toBe(1);
+
+    const second = await openSecondTab(context, T);
+    await expect(second.locator('#banner')).toContainText('另一个标签页正在负责提醒');
+    await second.locator('#btnTakeover').click();
+    await expect(second.locator('#banner')).toBeHidden();
+
+    await runBothTabs(page, second, 45_000);
+
+    // 接管之后只允许新页面响；原页面应已让出控制权
+    await expect(second.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+    await expect(page.locator('#banner')).toContainText('另一个标签页正在负责提醒');
+  });
+
+  test('接管时，原来正在响的提醒会被停掉', async ({ page, context, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+    await addJob(page, { label: '喝水' });
+
+    await page.clock.runFor(45_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+
+    const second = await openSecondTab(context, '2026-03-10T09:00:20+08:00');
+    await expect(second.locator('#banner')).toContainText('另一个标签页正在负责提醒');
+    await second.locator('#btnTakeover').click();
+
+    await page.clock.runFor(2_000);
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+    await expect(page.locator('#banner')).toContainText('另一个标签页正在负责提醒');
   });
 
   test('移动端：编辑器与列表在窄屏可用且不溢出', async ({ page, isMobile }) => {
