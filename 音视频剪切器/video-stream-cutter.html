@@ -23,7 +23,8 @@
   }
   header h1{margin:0;font-size:20px;letter-spacing:.5px}
   header h1 .en{font-size:13px;color:var(--dim);font-weight:400;margin-left:10px}
-  .badges{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+  .badges{margin-top:8px;display:flex;flex-wrap:wrap;margin-right:-8px;margin-bottom:-8px}
+  .badges > *{margin:0 8px 8px 0}
   .badge{
     font-size:12px;padding:2px 10px;border-radius:20px;border:1px solid var(--line);
     background:var(--panel);color:var(--dim);
@@ -62,10 +63,13 @@
   @media (max-width:860px){.layout{grid-template-columns:1fr}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 1px 3px #1b24340d}
   .card h3{margin:0 0 10px;font-size:13px;color:var(--dim);font-weight:600;letter-spacing:1px}
-  video{width:100%;background:#000;border-radius:8px;display:block;aspect-ratio:16/9}
-  .playbar{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
-  .playbar label{color:var(--dim);font-size:12.5px;display:flex;gap:5px;align-items:center;cursor:pointer}
-  .playbar input[type=checkbox]{accent-color:var(--acc)}
+  .video-wrap{position:relative;padding-top:56.25%;background:#000;border-radius:8px;overflow:hidden}
+  .video-wrap video{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+  /* 用子元素外边距代替 flex gap，兼容到 Chrome 76 / Safari 14 */
+  .playbar{display:flex;align-items:center;margin-top:10px;flex-wrap:wrap;margin-right:-8px;margin-bottom:-8px}
+  .playbar > *{margin:0 8px 8px 0}
+  .playbar label{color:var(--dim);font-size:12.5px;display:flex;align-items:center;cursor:pointer}
+  .playbar label input{margin:0 5px 0 0}
   #infoList,#resList{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
   #infoList dt,#resList dt{color:var(--dim)}
   #infoList dd,#resList dd{margin:0;text-align:right;word-break:break-all}
@@ -78,8 +82,10 @@
   }
   .tl-scale{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-top:4px}
 
-  .time-inputs{display:flex;gap:14px;align-items:center;margin-top:14px;flex-wrap:wrap}
-  .time-inputs label{color:var(--dim);display:flex;align-items:center;gap:8px}
+  .time-inputs{display:flex;align-items:center;margin-top:14px;flex-wrap:wrap;margin-right:-14px;margin-bottom:-14px}
+  .time-inputs > *{margin:0 14px 14px 0}
+  .time-inputs label{color:var(--dim);display:flex;align-items:center}
+  .time-inputs label input{margin-left:8px}
   .time-inputs input{
     font:inherit;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;
     background:#ffffff;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 10px;width:130px;
@@ -88,9 +94,11 @@
   .fmt-hint{color:var(--dim);font-size:12px}
   .snap-note{color:#b45309;font-size:12.5px;margin:10px 0 0;min-height:20px}
 
-  .actions{display:flex;gap:14px;align-items:center;margin-top:18px;flex-wrap:wrap}
+  .actions{display:flex;align-items:center;margin-top:18px;flex-wrap:wrap;margin-bottom:-14px}
+  .actions > *{margin:0 14px 14px 0}
   #cutBtn{padding:10px 22px;font-size:15px}
-  .progress{flex:1;min-width:200px;display:none;align-items:center;gap:10px}
+  .progress{flex:1;min-width:200px;display:none;align-items:center}
+  .progress > * + *{margin-left:10px}
   .progress.on{display:flex}
   .progress .track{flex:1;height:8px;background:#e6ebf3;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
   .progress .bar{height:100%;width:0;background:linear-gradient(90deg,#1f6feb,#0a9d6e);transition:width .2s}
@@ -98,7 +106,8 @@
 
   #result{margin-top:18px;border-color:#a9dfc9}
   #result h3{color:var(--ok)}
-  .res-actions{display:flex;gap:10px;margin:12px 0;align-items:center;flex-wrap:wrap}
+  .res-actions{display:flex;margin:12px 0 2px;align-items:center;flex-wrap:wrap}
+  .res-actions > *{margin:0 10px 10px 0}
   .ffcmd{margin-top:8px;background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
   .ffcmd p{margin:0 0 6px;color:var(--dim);font-size:12px}
   .ffcmd code{color:#b45309;font-size:12.5px;word-break:break-all}
@@ -126,7 +135,7 @@
 <body>
 
 <header>
-  <h1>视频无损剪切器 <span class="en">Stream Copy Cutter</span> <span class="ver">v1.2.1</span></h1>
+  <h1>视频无损剪切器 <span class="en">Stream Copy Cutter</span> <span class="ver">v1.3.0</span></h1>
   <div class="badges">
     <span class="badge"><b>●</b> 纯前端单文件</span>
     <span class="badge"><b>●</b> 完全离线 · 文件不上传</span>
@@ -148,7 +157,9 @@
   <section id="editor" hidden>
     <div class="layout">
       <div class="card">
-        <video id="video" controls playsinline preload="metadata"></video>
+        <div class="video-wrap">
+          <video id="video" controls playsinline preload="metadata"></video>
+        </div>
         <div class="playbar">
           <button id="btnSetStart" type="button" title="快捷键 I">⇤ 设为起点 (I)</button>
           <button id="btnSetEnd" type="button" title="快捷键 O">设为终点 (O) ⇥</button>
@@ -171,8 +182,8 @@
       <label>开始 <input id="inTime" class="mono" value="00:00.000" spellcheck="false"></label>
       <label>结束 <input id="outTime" class="mono" value="00:00.000" spellcheck="false"></label>
       <span class="fmt-hint">可填 69 ｜ 01:09（分:秒）｜ 00:01:09（时:分:秒）</span>
-      <div style="display:flex;gap:6px">
-        <button id="fBack" type="button" title="后退一帧">−1 帧</button>
+      <div style="display:flex">
+        <button id="fBack" type="button" title="后退一帧" style="margin-right:6px">−1 帧</button>
         <button id="fFwd" type="button" title="前进一帧">+1 帧</button>
       </div>
     </div>

@@ -72,10 +72,12 @@
 
 | 页面 | Chrome / Edge | Firefox | Safari | iOS Safari |
 | --- | --- | --- | --- | --- |
-| 音频版 | 84 | 74 | 14.1 | 14.5 |
-| 视频版 | 88 | 89 | 15 | 15 |
+| 音频版 | 76 | 69 | 14 | 14.5 |
+| 视频版 | 76 | 69 | 14 | 14.5 |
 
-- 音频版：flex `gap`（Chrome 84 / Safari 14.1）、可选链（Chrome 80 / Firefox 74）、`Blob.arrayBuffer()`（Safari 14）里最高的那个
-- 视频版多一条 `aspect-ratio`（Chrome 88 / Firefox 89 / Safari 15），用来锁住预览区的 16:9
+- 两个页面都用 `file.arrayBuffer()` 一次性读入文件，这是共同门槛（Chrome 76 / Firefox 69 / Safari 14）
+- 布局不再依赖 flex `gap`（Chrome 84 / Safari 14.1），改用子元素外边距；复选框也不再用 `accent-color`
+- 视频预览区用 `padding-top: 56.25%` 锁住 16:9，不再需要 `aspect-ratio`（Chrome 88 / Firefox 89 / Safari 15）
+- 音频版里唯一一处可选链已改成普通 `&&` 判断，不再要求 Firefox 74
 
 Firefox 未纳入 CI 测试矩阵，版本按特性支持情况推算；低于表中版本时页面可能仍能打开，但会出现排版错位或个别功能不可用。不支持 IE。

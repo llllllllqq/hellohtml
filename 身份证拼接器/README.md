@@ -56,6 +56,8 @@
 | Safari | 14 | `Blob.arrayBuffer()`（14） |
 | iOS Safari | 14.5 | 同样是 `Blob.arrayBuffer()`，iOS 上要 14.5 |
 
+页面布局不再依赖 flex `gap`（Chrome 84 / Safari 14.1），按钮组和操作区改用子元素外边距，所以上表就是实际门槛。
+
 `Blob.arrayBuffer()` 只在导出 PDF、把 JPEG 塞进 PDF 时用到；更老的浏览器「下载 JPG」仍然正常，只有 PDF 会提示处理失败。
 
 Firefox 未纳入 CI 测试矩阵，版本按特性支持情况推算；低于表中版本时页面可能仍能打开，但会出现排版错位或个别功能不可用。不支持 IE。
