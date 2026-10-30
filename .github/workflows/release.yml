@@ -24,18 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Check tag matches the newest subproject version
+      - name: Check all page versions are identical and match the tag
         run: |
-          # 每个页面的标题处都标着自己的版本号（如 v1.0.0），发布号取所有子项目的最大值。
-          grep -rhoE 'class="ver"[^>]*>v[0-9]+(\.[0-9]+)*' --include='*.html' . \
-            | sed -E 's/.*>v//' | sort -V -u > versions.txt
-          echo "各子项目版本：" && cat versions.txt
-          MAX="$(tail -n 1 versions.txt)"
-          echo "最高版本 v$MAX / 本次标签 ${GITHUB_REF_NAME}"
-          if [ "v$MAX" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::标签 ${GITHUB_REF_NAME} 与子项目最高版本 v$MAX 不一致，请改版本号或换个标签"
-            exit 1
-          fi
+          # 九个页面共用一个版本号；标签必须等于这个统一版本号。
+          # 校验逻辑与 tests/structure.spec.js 用的是同一个脚本。
+          node scripts/versions.js check "${GITHUB_REF_NAME}"
 
       - name: Package HTML only
         run: |
