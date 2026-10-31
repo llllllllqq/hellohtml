@@ -364,6 +364,41 @@ test.describe('提醒器', () => {
     await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
   });
 
+  test('页面被冻结后恢复，会补弹挂起期间到点的提醒', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:00+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+
+    await addJob(page, { label: '喝水' });
+
+    // 模拟浏览器冻结页面：定时器停住，系统时间继续走了 5 分钟
+    await page.evaluate(() => document.dispatchEvent(new Event('freeze')));
+    await page.clock.setSystemTime(new Date('2026-03-10T09:04:00+08:00'));
+    await page.evaluate(() => document.dispatchEvent(new Event('resume')));
+
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
+    await expect(page.locator('#alarmExtra')).toContainText('页面被挂起约 5 分钟');
+    await expect(page.locator('#alarmExtra')).toContainText('挂起期间到点');
+  });
+
+  test('冻结期间没有到期提醒时，只提示已重新校准', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:00:00+08:00');
+    await openPage(page);
+
+    await addJob(page, { label: '喝水' });
+
+    await page.evaluate(() => document.dispatchEvent(new Event('freeze')));
+    await page.clock.setSystemTime(new Date('2026-03-10T08:05:00+08:00'));
+    await page.evaluate(() => document.dispatchEvent(new Event('resume')));
+
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+    await expect(page.locator('#toast')).toContainText('页面被挂起约 5 分钟');
+    await expect(page.locator('#toast')).toContainText('已重新校准时间');
+  });
+
   test('编辑提醒：改内容与时间', async ({ page, isMobile }) => {
     test.skip(isMobile, '只在桌面端跑');
     await installClock(page, BASE);

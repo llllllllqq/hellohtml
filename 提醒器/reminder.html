@@ -193,7 +193,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
   <div class="app">
 
     <div class="hd">
-      <div class="hd-title">提醒器 <span class="ver">v1.3.0</span></div>
+      <div class="hd-title">提醒器 <span class="ver">v1.4.0</span></div>
       <div class="hd-time" id="clock">--:--:--</div>
     </div>
 
@@ -410,6 +410,12 @@ var flashTimer = null;
 var origTitle = document.title;
 var faviconLink = null;   // 动态的标签页图标，有提醒时带红点
 var tickTimer = null;
+var lastTickAt = Date.now();   // 上一次 tick 的墙钟时间，用来发现页面被挂起
+var frozenAt = 0;               // 收到 Page Lifecycle freeze 的时间
+var hiddenAt = 0;               // 页面进入后台的时间
+var pendingWakeGap = 0;         // 已确认的挂起时长，交给下一次 tick 处理
+var WAKE_GAP_MS = 120000;       // 定时器间隔超过 2 分钟才当作挂起，避免误报后台限速
+var WAKE_NOTICE_MS = 15000;     // 挂起超过 15 秒才提示
 var isOwner = false;
 var myOwnerTs = 0;      // 本页最后一次写 owner 的时间戳，用来判断是否被别人接管
 var TAB_ID = '';
@@ -780,6 +786,13 @@ function findJob(id) {
 function tick() {
   tickTimer = null;
   var now = Date.now();
+  var timerGap = now - lastTickAt;
+  lastTickAt = now;
+
+  // 定时器自己隔了很久才跑：系统休眠 / 页面被冻结 / 标签页被整体挂起
+  if (timerGap > WAKE_GAP_MS) noteWake(timerGap);
+  var wakeGap = pendingWakeGap;
+  pendingWakeGap = 0;
 
   // 被别的标签页接管了（手动或它的心跳更新），立刻停手，避免两个页面同时响
   if (isOwner && takenOverByOther()) stepDown();
@@ -787,6 +800,7 @@ function tick() {
   if (isOwner) {
     var due = [];
     var catchLimit = catchUpSpanMs();
+    var wakeSkipped = 0;
 
     for (var i = 0; i < data.jobs.length; i++) {
       var j = data.jobs[i];
@@ -802,7 +816,7 @@ function tick() {
       }
 
       // 错过太久就不打扰，静默顺延
-      if (now - first > catchLimit) continue;
+      if (now - first > catchLimit) { wakeSkipped++; continue; }
 
       due.push({ job: j, at: first, missed: n, late: now - first });
     }
@@ -819,7 +833,16 @@ function tick() {
     }
     if (snoozeFired) renderList();
 
-    if (due.length && !alarmOpen) fire(due);
+    if (due.length && !alarmOpen) {
+      fire(due, wakeGap, wakeSkipped);
+    } else if (wakeGap >= WAKE_NOTICE_MS && !alarmOpen) {
+      var msg = '页面被挂起约 ' + gapText(wakeGap) + '，已重新校准时间';
+      if (wakeSkipped) msg += '；' + wakeSkipped + ' 条提醒超出补提醒窗口，已跳过';
+      toast(msg);
+    }
+
+    // 挂起期间可能已经把响铃时长走完，恢复后重新核对一次自动静音
+    if (alarmOpen) rearmAutoStop();
   }
 
   paintClock();
@@ -833,10 +856,52 @@ function startTick() {
   tickTimer = setTimeout(tick, 200);
 }
 
+/* 把毫秒差写成「30 秒 / 5 分钟」 */
+function gapText(ms) {
+  var sec = Math.round(ms / 1000);
+  if (sec < 60) return Math.max(1, sec) + ' 秒';
+  return Math.max(1, Math.round(ms / 60000)) + ' 分钟';
+}
+
+/* 记下挂起时长，等下一次 tick 统一处理（可能同时收到 freeze + visibilitychange） */
+function noteWake(ms) {
+  if (ms > pendingWakeGap) pendingWakeGap = ms;
+}
+
+/* 立即跑一次 tick，而不是等下一个 1 秒定时器 */
+function runTickNow() {
+  if (tickTimer) {
+    clearTimeout(tickTimer);
+    tickTimer = null;
+  }
+  tick();
+}
+
+/* 页面重新可见 / freeze 恢复 / 从 bfcache 回来：算一下离开了多久 */
+function onPageWake(source) {
+  var now = Date.now();
+  var gap = 0;
+
+  if (frozenAt) {
+    gap = now - frozenAt;
+    frozenAt = 0;
+  } else if (hiddenAt) {
+    gap = now - hiddenAt;
+    // 隐藏期间 tick 还在跑（只是被后台限速），或者只是短暂切走，都不算页面被挂起
+    if (lastTickAt >= hiddenAt || gap < WAKE_GAP_MS) gap = 0;
+    hiddenAt = 0;
+  } else if (source === 'resume' || source === 'pageshow') {
+    gap = now - lastTickAt;
+  }
+
+  if (gap > WAKE_NOTICE_MS) noteWake(gap);
+  runTickNow();
+}
+
 /* =====================================================================
    触发提醒
    ===================================================================== */
-function fire(dueList) {
+function fire(dueList, wakeGap, wakeSkipped) {
   alarmOpen = true;
   alarms = dueList;
 
@@ -847,7 +912,9 @@ function fire(dueList) {
   $('alarmTime').textContent = '原定 ' + timeText;
 
   var extra = '';
-  if (first.onBoot) {
+  if (wakeGap >= WAKE_NOTICE_MS) {
+    extra = '页面被挂起约 ' + gapText(wakeGap) + '，这条提醒在挂起期间到点';
+  } else if (first.onBoot) {
     extra = '页面刚打开，这条提醒 ' + Math.round(first.late / 60000) + ' 分钟前已到点';
   } else if (first.late > 60000) {
     extra = '晚了 ' + Math.round(first.late / 60000) + ' 分钟才提醒你';
@@ -861,6 +928,7 @@ function fire(dueList) {
   for (var m = 0; m < dueList.length; m++) if (dueList[m].missed > 1) missedCount += dueList[m].missed - 1;
 
   if (missedCount > 0) extra += (extra ? '，' : '') + '另有 ' + missedCount + ' 次未提醒已跳过';
+  if (wakeSkipped > 0) extra += (extra ? '，' : '') + '另有 ' + wakeSkipped + ' 条超出补提醒窗口，未补提醒';
   $('alarmExtra').textContent = extra;
 
   if (more.length) {
@@ -1813,9 +1881,23 @@ function bindEvents() {
     this.value = '';
   });
 
-  // 页面重新可见时停掉标题闪烁（提醒弹层还在，不需要再闪）
+  // 页面重新可见：停掉标题闪烁，并立刻补一次检查（后台限速/冻结后可能已经错过）
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && alarmOpen) stopFlash();
+    if (document.hidden) {
+      hiddenAt = Date.now();
+      return;
+    }
+    if (alarmOpen) stopFlash();
+    onPageWake('visibility');
+  });
+
+  // Page Lifecycle API（Chrome）：页面被浏览器冻结 / 解冻
+  document.addEventListener('freeze', function () { frozenAt = Date.now(); });
+  document.addEventListener('resume', function () { onPageWake('resume'); });
+
+  // 从 bfcache 恢复时，定时器可能已经停了很久
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) onPageWake('pageshow');
   });
 
   window.addEventListener('beforeunload', clearOwner);
