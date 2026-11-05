@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>音频信号发生器 · 离线双声道测试工具</title>
+<style>
+  /* ===== 极简样式：白底黑字，无外部资源 ===== */
+  :root{
+    --bg:#ffffff; --panel:#ffffff; --line:#999999; --line-2:#888888;
+    --text:#000000; --muted:#333333; --dim:#666666;
+    --accent:#000000; --accent-2:#777777; --danger:#000000;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;min-height:100%}
+  body{background:#ffffff;color:#000000;
+    font-family:Arial,Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+    padding:18px 14px 30px}
+  .app{max-width:1000px;margin:0 auto}
+
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:19px;margin:0;font-weight:600}
+  .ver{font-family:var(--mono);font-size:11px;font-weight:400;color:#666666;
+    border:1px solid #999999;padding:1px 6px;margin-left:8px;vertical-align:2px}
+  .sub{color:#333333;font-size:12.5px;margin-top:6px;line-height:1.6}
+  .badge{display:none}
+
+  main{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .card{background:#ffffff;border:1px solid #999999;border-radius:0;padding:14px 16px}
+  .card.full{grid-column:1/-1}
+  .card h2{font-size:12px;color:#000000;margin:0 0 13px;font-weight:600;display:flex;align-items:center;gap:9px}
+  .card h2::before{display:none}
+  .card h2 .hint{color:#666666;font-size:11px;font-weight:400;margin-left:auto}
+
+  .freq-display{font-family:var(--mono);font-size:clamp(34px,6vw,52px);font-weight:600;
+    line-height:1;color:#000000;word-break:break-all}
+  .freq-display .unit{font-size:.4em;color:#000000;margin-left:8px;letter-spacing:0}
+  .freq-meta{color:#444444;font-size:12.5px;margin-top:9px;font-family:var(--mono);min-height:18px}
+  .freq-meta b{color:#000000;font-weight:600}
+
+  .freq-row{display:flex;gap:9px;align-items:stretch;margin-top:16px;flex-wrap:wrap}
+  .btn{background:#ffffff;border:1px solid #888888;color:#000000;border-radius:0;
+    padding:8px 13px;font-size:13px;cursor:pointer;white-space:nowrap;font-family:inherit;line-height:1.35}
+  .btn:hover{background:#eeeeee}
+  .btn:active{background:#dddddd}
+  .btn.half{min-width:104px;font-family:var(--mono)}
+  .btn.half .ar{color:#000000;margin-right:5px}
+  .btn.half.right .ar{margin:0 0 0 5px}
+  .input-wrap{flex:1;min-width:170px;display:flex;align-items:center;gap:8px;
+    background:#ffffff;border:1px solid #888888;padding:0 12px}
+  .input-wrap:focus-within{border-color:#000000;outline:1px solid #000000}
+  .input-wrap input{width:100%;background:transparent;border:0;outline:none;color:#000000;
+    font-family:var(--mono);font-size:16px;padding:9px 0;min-width:0}
+  .input-wrap .lab{font-size:11px;color:#666666;white-space:nowrap}
+  .input-wrap .suf{font-family:var(--mono);font-size:12px;color:#000000}
+
+  .slider-block{margin-top:18px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;
+    outline:none;cursor:pointer;--pct:50%;--c:#000000;
+    background:linear-gradient(90deg,var(--c) var(--pct),#ffffff var(--pct));
+    border:1px solid #888888;border-radius:0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:18px;
+    background:#000000;border:1px solid #000000;cursor:pointer;border-radius:0}
+  input[type=range]::-moz-range-thumb{width:10px;height:16px;background:#000000;
+    border:1px solid #000000;cursor:pointer;border-radius:0}
+  input[type=range]:focus-visible{outline:2px solid #000000;outline-offset:2px}
+  .ticks{position:relative;height:17px;margin-top:9px}
+  .ticks span{position:absolute;transform:translateX(-50%);font-family:var(--mono);
+    font-size:10.5px;color:#666666;white-space:nowrap;top:0}
+  .ticks span:first-child{transform:none}
+  .ticks span:last-child{transform:translateX(-100%)}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center}
+  .presets .pl{font-size:11px;color:#666666;margin-right:3px}
+  .chip{background:#ffffff;border:1px solid #999999;color:#000000;border-radius:0;
+    padding:5px 10px;font-size:11.5px;cursor:pointer;font-family:var(--mono)}
+  .chip:hover{background:#eeeeee}
+
+  .wave-group{margin-bottom:13px}
+  .wave-group:last-child{margin-bottom:0}
+  .group-label{font-size:10.5px;color:#666666;margin-bottom:8px}
+  .waves{display:flex;flex-wrap:wrap;gap:6px}
+  .wave{display:flex;align-items:center;gap:8px;padding:6px 9px;min-width:122px;
+    border:1px solid #999999;background:#ffffff;border-radius:0;cursor:pointer;text-align:left;font-family:inherit}
+  .wave svg{width:38px;height:16px;flex:none;fill:none;stroke:#000000;stroke-width:1.2;
+    stroke-linejoin:round;stroke-linecap:round;overflow:visible}
+  .wave .txt{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+  .wave .cn{font-size:12.5px;color:#000000;white-space:nowrap}
+  .wave .en{font-size:9px;color:#666666;font-family:var(--mono);white-space:nowrap}
+  .wave:hover{background:#eeeeee}
+  .wave.active{background:#000000;border-color:#000000}
+  .wave.active svg{stroke:#ffffff}
+  .wave.active .cn{color:#ffffff;font-weight:600}
+  .wave.active .en{color:#dddddd}
+
+  .ch{margin-bottom:15px}
+  .ch:last-of-type{margin-bottom:11px}
+  .ch-head{display:flex;align-items:center;gap:9px;margin-bottom:8px;font-size:12.5px}
+  .ch-tag{font-family:var(--mono);font-weight:700;font-size:12px;width:22px;height:22px;
+    display:inline-flex;align-items:center;justify-content:center;border:1px solid #000000;flex:none}
+  .ch-tag.l{background:#000000;color:#ffffff}
+  .ch-tag.r{background:#ffffff;color:#000000}
+  .ch-val{margin-left:auto;font-family:var(--mono);font-size:13px;color:#000000}
+  .ch-db{font-family:var(--mono);font-size:10.5px;color:#666666;width:66px;text-align:right}
+  .ch input[type=range]{--c:#000000}
+  .ch.r input[type=range]{--c:#777777}
+  .ch-tools{display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid #cccccc;padding-top:12px;margin-top:4px}
+  .ch-tools .chip{flex:1;min-width:66px;text-align:center;font-family:inherit;font-size:11.5px}
+  .ch-tools .chip.on{background:#000000;color:#ffffff;border-color:#000000}
+  .linkline{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#333333;margin-top:10px;cursor:pointer;user-select:none}
+  .linkline input{accent-color:#000000;width:14px;height:14px;cursor:pointer}
+
+  .balance{margin-top:13px;border-top:1px solid #cccccc;padding-top:12px}
+  .balance-head{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#666666;margin-bottom:9px}
+  .balance-head b{color:#000000;font-weight:600;font-family:var(--mono);font-size:11.5px}
+  .balance-track{position:relative;height:8px;border:1px solid #888888;background:#f0f0f0}
+  .balance-track i{position:absolute;top:-4px;width:3px;height:14px;background:#000000;transform:translateX(-50%)}
+  .balance-scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:#666666;margin-top:7px}
+
+  .scope{width:100%;height:186px;display:block;border:1px solid #999999;background:#ffffff}
+  .scope-bar{display:flex;align-items:center;gap:16px;margin-top:11px;flex-wrap:wrap;font-size:11px}
+  .legend{display:flex;gap:14px;color:#333333}
+  .legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:6px}
+  .wininfo{margin-left:auto;font-family:var(--mono);color:#666666;font-size:10.5px}
+  .meters{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:13px}
+  .meter{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10.5px;color:#333333}
+  .meter .k{width:12px;font-weight:700}
+  .meter .bar{height:8px;background:#ffffff;border:1px solid #999999;overflow:hidden;flex:1}
+  .meter .bar i{display:block;height:100%;width:0}
+  .meter .bar i.l{background:#000000}
+  .meter .bar i.r{background:#777777}
+  .meter .v{width:74px;text-align:right;color:#666666}
+
+  .transport{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .play-btn{font-size:15px;font-weight:600;padding:13px 28px;min-width:160px;
+    border:1px solid #000000;background:#ffffff;color:#000000;cursor:pointer;font-family:inherit}
+  .play-btn:hover{background:#eeeeee}
+  .play-btn:active{background:#dddddd}
+  .play-btn.playing{background:#000000;color:#ffffff;border-color:#000000}
+  .status{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#333333}
+  .dot{width:9px;height:9px;border:1px solid #000000;background:#ffffff;flex:none}
+  .dot.on{background:#000000}
+  .devinfo{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:#666666;text-align:right;line-height:1.7}
+  .advisory{margin-top:13px;padding:9px 12px;font-size:12px;line-height:1.65;
+    border:1px solid #999999;background:#ffffff;color:#333333}
+  .advisory.warn{border:2px solid #000000;color:#000000;font-weight:600}
+  .advisory.danger{border:2px solid #000000;color:#000000;font-weight:600}
+
+  footer{margin-top:16px;color:#666666;font-size:11.5px;line-height:1.9;text-align:center}
+  footer kbd{font-family:var(--mono);background:#ffffff;border:1px solid #999999;color:#000000;font-size:10.5px;padding:1px 5px}
+
+  @media (max-width:780px){
+    main{grid-template-columns:1fr}
+    .card.full{grid-column:auto}
+    .freq-row .btn.half{flex:1;min-width:0}
+    .input-wrap{order:-1;flex-basis:100%}
+    .devinfo{margin-left:0;text-align:left;width:100%}
+    .meters{grid-template-columns:1fr}
+    .wininfo{margin-left:0;width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <h1>音频信号发生器 <span class="ver">v1.5.0</span></h1>
+      <div class="sub">纯离线单文件 · 双声道独立输出 · 用于扬声器、耳机与声卡测试<br>频率 1 Hz – 22 000 Hz，支持对数滑杆、精确输入与倍频切换</div>
+    </div>
+    <div class="badge"><i></i> 100% OFFLINE · WEB AUDIO</div>
+  </header>
+
+  <main>
+    <!-- ============ 频率 ============ -->
+    <section class="card full">
+      <h2>频率 FREQUENCY <span class="hint">对数滑杆 / 精确输入 / 减半与翻倍</span></h2>
+      <div class="freq-display"><span id="freqBig">440.00</span><span class="unit">Hz</span></div>
+      <div class="freq-meta" id="freqMeta"></div>
+
+      <div class="freq-row">
+        <button class="btn half" id="btnHalf" title="频率减半（键盘 ←）"><span class="ar">&#9664;</span> 减半 &times;&frac12;</button>
+        <div class="input-wrap">
+          <span class="lab">精确输入</span>
+          <input type="number" id="freqInput" min="1" max="22000" step="any" value="440" inputmode="decimal" aria-label="精确频率输入">
+          <span class="suf">Hz</span>
+        </div>
+        <button class="btn half right" id="btnDouble" title="频率翻倍（键盘 →）">翻倍 &times;2 <span class="ar">&#9654;</span></button>
+      </div>
+
+      <div class="slider-block">
+        <input type="range" id="freqSlider" min="0" max="1000" step="1" value="609" aria-label="频率对数滑杆">
+        <div class="ticks" id="ticks"></div>
+        <div class="presets" id="presets"><span class="pl">快捷预设</span></div>
+      </div>
+    </section>
+
+    <!-- ============ 波形 ============ -->
+    <section class="card">
+      <h2>波形 WAVEFORM <span class="hint" id="waveHint"></span></h2>
+      <div id="waveGroups"></div>
+    </section>
+
+    <!-- ============ 声道音量 ============ -->
+    <section class="card">
+      <h2>声道音量 CHANNEL LEVEL <span class="hint">0 – 100，独立可调</span></h2>
+
+      <div class="ch">
+        <div class="ch-head"><span class="ch-tag l">L</span><span>左声道</span>
+          <span class="ch-val" id="valL">30</span><span class="ch-db" id="dbL">-10.5 dB</span></div>
+        <input type="range" id="volL" min="0" max="100" step="1" value="30" aria-label="左声道音量">
+      </div>
+      <div class="ch r">
+        <div class="ch-head"><span class="ch-tag r">R</span><span>右声道</span>
+          <span class="ch-val" id="valR">30</span><span class="ch-db" id="dbR">-10.5 dB</span></div>
+        <input type="range" id="volR" min="0" max="100" step="1" value="30" aria-label="右声道音量">
+      </div>
+
+      <div class="ch-tools">
+        <button class="chip" id="onlyL">仅左声道</button>
+        <button class="chip" id="onlyR">仅右声道</button>
+        <button class="chip" id="both">双声道</button>
+        <button class="chip" id="mute">静音</button>
+      </div>
+      <label class="linkline"><input type="checkbox" id="link"> 联动左右声道（调整其中一个，另一个同步）</label>
+
+      <div class="balance">
+        <div class="balance-head"><span>声道平衡 BALANCE</span><b id="balText">居中</b></div>
+        <div class="balance-track"><i id="balMark" style="left:50%"></i></div>
+        <div class="balance-scale"><span>仅左 L</span><span>居中</span><span>R 仅右</span></div>
+      </div>
+    </section>
+
+    <!-- ============ 示波器 ============ -->
+    <section class="card full">
+      <h2>实时波形与电平 OSCILLOSCOPE <span class="hint">真实输出信号 · 双通道</span></h2>
+      <canvas class="scope" id="scope"></canvas>
+      <div class="scope-bar">
+        <div class="legend"><span><i style="background:var(--accent)"></i>L 左声道</span>
+          <span><i style="background:var(--accent-2)"></i>R 右声道</span></div>
+        <span class="wininfo" id="winInfo"></span>
+      </div>
+      <div class="meters">
+        <div class="meter"><span class="k" style="color:var(--accent)">L</span>
+          <div class="bar"><i class="l" id="barL"></i></div><span class="v" id="rmsL">-∞ dBFS</span></div>
+        <div class="meter"><span class="k" style="color:var(--accent-2)">R</span>
+          <div class="bar"><i class="r" id="barR"></i></div><span class="v" id="rmsR">-∞ dBFS</span></div>
+      </div>
+    </section>
+
+    <!-- ============ 播放 ============ -->
+    <section class="card full">
+      <h2>输出控制 TRANSPORT</h2>
+      <div class="transport">
+        <button class="play-btn" id="playBtn">&#9654; 开始播放</button>
+        <div class="status"><span class="dot" id="dot"></span><span id="statusText">就绪 · 未输出</span></div>
+        <div class="devinfo" id="devInfo">采样率 — · Nyquist —<br>等待音频引擎启动</div>
+      </div>
+      <div class="advisory" id="advisory"></div>
+    </section>
+  </main>
+
+  <footer>
+    快捷键：<kbd>空格</kbd> 播放 / 停止 &nbsp;·&nbsp; <kbd>←</kbd> 减半 &nbsp;·&nbsp; <kbd>→</kbd> 翻倍 &nbsp;·&nbsp; <kbd>↑</kbd><kbd>↓</kbd> 微调 ±2%
+    （焦点在输入框或滑杆内时快捷键不生效，避免干扰输入）<br>
+    声音将持续输出，直到点击「停止播放」。建议先把音量调低再开始，高频段请保护听力与高音单元。
+  </footer>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ============================================================
+     常量与状态
+     ============================================================ */
+  const MIN_F = 1, MAX_F = 22000, SLIDER_MAX = 1000;
+  const NOISE = { white:true, pink:true, brown:true };
+  const isNoise = k => !!NOISE[k];
+
+  const state = {
+    freq: 440,
+    wave: 'sine',
+    volL: 30,
+    volR: 30,
+    link: false,
+    muted: false,
+    playing: false
+  };
+
+  // 波形定义：内置 4 种用 OscillatorNode.type，其余用自定义 PeriodicWave
+  const WAVE_DEFS = [
+    { group:'周期波形', items:[
+      { k:'sine',      cn:'正弦波',        en:'SINE' },
+      { k:'triangle',  cn:'斜波 / 三角波', en:'TRIANGLE' },
+      { k:'sawtooth',  cn:'锯齿波 上升',   en:'SAW UP' },
+      { k:'sawdown',   cn:'锯齿波 下降',   en:'SAW DOWN' },
+      { k:'square',    cn:'方波',          en:'SQUARE' },
+      { k:'pulse25',   cn:'脉冲波 25%',    en:'PULSE 25' },
+      { k:'pulse10',   cn:'脉冲波 10%',    en:'PULSE 10' },
+      { k:'halfrect',  cn:'半波整流',      en:'HALF RECT' },
+      { k:'fullrect',  cn:'全波整流',      en:'FULL RECT' },
+      { k:'organ',     cn:'谐波叠加',      en:'HARMONIC' }
+    ]},
+    { group:'噪声信号（全带宽，频率设置不影响输出）', items:[
+      { k:'white', cn:'白噪声',   en:'WHITE' },
+      { k:'pink',  cn:'粉红噪声', en:'PINK' },
+      { k:'brown', cn:'布朗噪声', en:'BROWN' }
+    ]}
+  ];
+
+  const PRESETS = [1, 20, 100, 440, 1000, 5000, 10000, 15000, 20000, 22000];
+  const BUILTIN = { sine:true, square:true, sawtooth:true, triangle:true };
+
+  /* ============================================================
+     DOM
+     ============================================================ */
+  const $ = id => document.getElementById(id);
+  const el = {
+    freqBig:$('freqBig'), freqMeta:$('freqMeta'), freqSlider:$('freqSlider'),
+    freqInput:$('freqInput'), ticks:$('ticks'), presets:$('presets'),
+    waveGroups:$('waveGroups'), waveHint:$('waveHint'),
+    volL:$('volL'), volR:$('volR'), valL:$('valL'), valR:$('valR'),
+    dbL:$('dbL'), dbR:$('dbR'), link:$('link'),
+    onlyL:$('onlyL'), onlyR:$('onlyR'), both:$('both'), mute:$('mute'),
+    balText:$('balText'), balMark:$('balMark'),
+    scope:$('scope'), winInfo:$('winInfo'),
+    barL:$('barL'), barR:$('barR'), rmsL:$('rmsL'), rmsR:$('rmsR'),
+    playBtn:$('playBtn'), dot:$('dot'), statusText:$('statusText'),
+    devInfo:$('devInfo'), advisory:$('advisory'),
+    btnHalf:$('btnHalf'), btnDouble:$('btnDouble')
+  };
+
+  /* ============================================================
+     频率 ↔ 对数滑杆 映射
+     ============================================================ */
+  const LOG_SPAN = Math.log(MAX_F / MIN_F);
+  const sliderToFreq = v => MIN_F * Math.exp(LOG_SPAN * (v / SLIDER_MAX));
+  const freqToSlider = f => SLIDER_MAX * Math.log(f / MIN_F) / LOG_SPAN;
+  const clampFreq = f => Math.min(MAX_F, Math.max(MIN_F, f));
+  const fmtFreq = f => f.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const round2 = f => Math.round(f * 100) / 100;
+
+  function noteInfo(f){
+    const n = Math.round(69 + 12 * Math.log2(f / 440));
+    const names = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+    const name = names[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1);
+    const ideal = 440 * Math.pow(2, (n - 69) / 12);
+    const cents = Math.round(1200 * Math.log2(f / ideal));
+    return name + (cents === 0 ? '' : (cents > 0 ? ' +' : ' ') + cents + '¢');
+  }
+
+  function setSliderFill(input, pct){
+    input.style.setProperty('--pct', Math.max(0, Math.min(100, pct)) + '%');
+  }
+
+  function syncFreqUI(from){
+    const f = state.freq;
+    el.freqBig.textContent = fmtFreq(f);
+    const khz = (f / 1000).toFixed(f < 1000 ? 3 : 2);
+    el.freqMeta.innerHTML = '≈ <b>' + noteInfo(f) + '</b> &nbsp;·&nbsp; ' + khz + ' kHz &nbsp;·&nbsp; 周期 ' +
+      (f >= 1000 ? (1e6 / f).toFixed(2) + ' µs' : (1000 / f).toFixed(2) + ' ms');
+
+    const sv = freqToSlider(f);
+    el.freqSlider.value = String(Math.round(sv));
+    setSliderFill(el.freqSlider, sv / SLIDER_MAX * 100);
+
+    // 用户在输入框内打字时不回写，避免打断输入；失焦/回车时再格式化
+    if (from !== 'number') el.freqInput.value = String(round2(f));
+    updateAdvisory();
+  }
+
+  function setFrequency(value, from){
+    const f = parseFloat(value);
+    if (!Number.isFinite(f)) return;
+    state.freq = clampFreq(f);
+
+    // 播放中实时改变 OscillatorNode 频率，不中断声音（相位连续，10 ms 精确过渡到目标值）
+    if (ctx && source && state.playing && source.frequency){
+      const p = source.frequency, t = ctx.currentTime;
+      p.cancelScheduledValues(t);
+      p.setValueAtTime(p.value, t);
+      p.linearRampToValueAtTime(state.freq, t + 0.01);
+    }
+    syncFreqUI(from);
+  }
+
+  /* ============================================================
+     音频引擎
+     ============================================================ */
+  let ctx = null, srcGain = null, gainL = null, gainR = null;
+  let analyserL = null, analyserR = null, merger = null;
+  let source = null;                 // OscillatorNode 或 AudioBufferSourceNode
+  let sourceToken = 0;              // 防止波形快速切换产生竞态
+  let bufL = null, bufR = null;
+  const noiseCache = {}, waveCache = {};
+
+  function ensureAudio(){
+    if (ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+
+    srcGain = ctx.createGain();
+    srcGain.gain.value = 0;                 // 仅用于启停/切换波形的淡入淡出
+    gainL = ctx.createGain();
+    gainR = ctx.createGain();
+    analyserL = ctx.createAnalyser();
+    analyserR = ctx.createAnalyser();
+    analyserL.fftSize = analyserR.fftSize = 4096;
+    merger = ctx.createChannelMerger(2);
+
+    // 信号链：源 → 淡入淡出 → 左右独立增益 → 各自分析器 → 声道合并器 → 输出
+    // 分析器串在主路径上，保证数据一定被拉取，且能分别测到 L / R 的真实电平
+    srcGain.connect(gainL);  srcGain.connect(gainR);
+    gainL.connect(analyserL); analyserL.connect(merger, 0, 0);
+    gainR.connect(analyserR); analyserR.connect(merger, 0, 1);
+    merger.connect(ctx.destination);
+
+    bufL = new Float32Array(analyserL.fftSize);
+    bufR = new Float32Array(analyserR.fftSize);
+    applyVolumes(true);
+    updateDevInfo();
+  }
+
+  function updateDevInfo(){
+    if (!ctx) return;
+    const sr = ctx.sampleRate;
+    el.devInfo.innerHTML = '采样率 ' + sr.toLocaleString('en-US') + ' Hz · Nyquist ' +
+      (sr / 2).toLocaleString('en-US') + ' Hz<br>输出 ' +
+      ctx.destination.channelCount + ' 声道 · 引擎 ' + ctx.state;
+  }
+
+  /* ---- 自定义周期波形（傅里叶级数系数） ---- */
+  function buildPeriodicWave(kind){
+    if (waveCache[kind]) return waveCache[kind];
+    const N = 64;
+    const real = new Float32Array(N + 1);
+    const imag = new Float32Array(N + 1);
+
+    if (kind === 'sawdown'){
+      // 下降锯齿 1-2t = Σ (2/πn)·sin(2πnt)
+      for (let n = 1; n <= N; n++) imag[n] = 2 / (Math.PI * n);
+    } else if (kind === 'pulse25' || kind === 'pulse10'){
+      // 零均值脉冲波：real[n]=2sin(2πnD)/(πn)，imag[n]=2(1-cos(2πnD))/(πn)
+      const D = kind === 'pulse25' ? 0.25 : 0.10;
+      for (let n = 1; n <= N; n++){
+        real[n] = 2 * Math.sin(2 * Math.PI * n * D) / (Math.PI * n);
+        imag[n] = 2 * (1 - Math.cos(2 * Math.PI * n * D)) / (Math.PI * n);
+      }
+    } else if (kind === 'halfrect'){
+      // 半波整流正弦（去掉直流分量）：imag[1]=1/2，real[2n]=-2/(π(4n²-1))
+      imag[1] = 0.5;
+      for (let n = 1; 2 * n <= N; n++) real[2 * n] = -2 / (Math.PI * (4 * n * n - 1));
+    } else if (kind === 'fullrect'){
+      // 全波整流正弦（去掉直流分量）：real[2n]=-4/(π(4n²-1))
+      for (let n = 1; 2 * n <= N; n++) real[2 * n] = -4 / (Math.PI * (4 * n * n - 1));
+    } else if (kind === 'organ'){
+      const h = [0, 1, .5, .34, .25, .2, .16, .12, .1];
+      for (let n = 1; n < h.length; n++) imag[n] = h[n];
+    }
+    // disableNormalization:false → 自动归一化到 ±1，各波形响度基本一致
+    const w = ctx.createPeriodicWave(real, imag, { disableNormalization:false });
+    waveCache[kind] = w;
+    return w;
+  }
+
+  /* ---- 噪声缓冲（3 秒循环） ---- */
+  function buildNoise(kind){
+    if (noiseCache[kind]) return noiseCache[kind];
+    const len = Math.floor(ctx.sampleRate * 3);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+
+    if (kind === 'white'){
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    } else if (kind === 'pink'){
+      // Paul Kellet 近似 -3 dB/oct
+      let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+      for (let i = 0; i < len; i++){
+        const w = Math.random() * 2 - 1;
+        b0 = 0.99886*b0 + w*0.0555179;
+        b1 = 0.99332*b1 + w*0.0750759;
+        b2 = 0.96900*b2 + w*0.1538520;
+        b3 = 0.86650*b3 + w*0.3104856;
+        b4 = 0.55000*b4 + w*0.5329522;
+        b5 = -0.7616*b5 - w*0.0168980;
+        d[i] = (b0+b1+b2+b3+b4+b5+b6+w*0.5362) * 0.11;
+        b6 = w * 0.115926;
+      }
+    } else { // brown
+      let last = 0;
+      for (let i = 0; i < len; i++){
+        const w = Math.random() * 2 - 1;
+        last = (last + 0.02 * w) / 1.02;
+        d[i] = last * 3.5;
+      }
+    }
+    noiseCache[kind] = buf;
+    return buf;
+  }
+
+  function createSource(){
+    const w = state.wave;
+    if (isNoise(w)){
+      const bs = ctx.createBufferSource();
+      bs.buffer = buildNoise(w);
+      bs.loop = true;
+      source = bs;
+    } else {
+      const o = ctx.createOscillator();
+      if (BUILTIN[w]) o.type = w;                    // 内置波形带限处理最干净
+      else o.setPeriodicWave(buildPeriodicWave(w)); // 自定义波形
+      o.frequency.value = state.freq;               // 精确设定，无自动化残留
+      source = o;
+    }
+    source.connect(srcGain);
+    source.start();
+  }
+
+  function disposeSource(){
+    if (!source) return;
+    try { source.stop(); } catch(e){}
+    try { source.disconnect(); } catch(e){}
+    source = null;
+  }
+
+  /* ---- 音量 ---- */
+  function applyVolumes(immediate){
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const l = state.muted ? 0 : state.volL / 100;
+    const r = state.muted ? 0 : state.volR / 100;
+    [[gainL, l], [gainR, r]].forEach(function(pair){
+      const g = pair[0].gain, v = pair[1];
+      g.cancelScheduledValues(t);
+      if (immediate){
+        g.value = v;                               // 立即且精确
+      } else {
+        g.setValueAtTime(g.value, t);              // 从当前值出发
+        g.linearRampToValueAtTime(v, t + 0.015);  // 15 ms 平滑到精确目标值
+      }
+    });
+  }
+
+  function syncVolUI(){
+    el.volL.value = String(state.volL);
+    el.volR.value = String(state.volR);
+    setSliderFill(el.volL, state.volL);
+    setSliderFill(el.volR, state.volR);
+    el.valL.textContent = state.volL;
+    el.valR.textContent = state.volR;
+    el.dbL.textContent = state.volL === 0 ? '-∞ dB' : (20 * Math.log10(state.volL / 100)).toFixed(1) + ' dB';
+    el.dbR.textContent = state.volR === 0 ? '-∞ dB' : (20 * Math.log10(state.volR / 100)).toFixed(1) + ' dB';
+    el.mute.classList.toggle('on', state.muted);
+    el.mute.textContent = state.muted ? '取消静音' : '静音';
+    el.link.checked = state.link;
+
+    // 声道平衡：b = (R - L) / (R + L)，-1 仅左、0 居中、+1 仅右
+    const l = state.muted ? 0 : state.volL, r = state.muted ? 0 : state.volR;
+    const sum = l + r;
+    let pos = 50, txt = '无输出';
+    if (sum > 0){
+      const b = (r - l) / sum;
+      pos = 50 + b * 50;
+      txt = Math.abs(b) < 0.005 ? '居中' : (b < 0 ? '偏左 ' : '偏右 ') + Math.round(Math.abs(b) * 100) + '%';
+    }
+    el.balMark.style.left = pos + '%';
+    el.balText.textContent = txt;
+  }
+
+  function setVolume(ch, v){
+    v = Math.max(0, Math.min(100, Math.round(v)));
+    if (ch === 'L'){
+      state.volL = v;
+      if (state.link) state.volR = v;
+    } else {
+      state.volR = v;
+      if (state.link) state.volL = v;
+    }
+    state.muted = false;
+    syncVolUI();
+    applyVolumes();
+  }
+
+  /* ---- 播放 / 停止 ---- */
+  async function play(){
+    ensureAudio();
+    try { if (ctx.state === 'suspended') await ctx.resume(); } catch(e){}
+    if (state.playing) return;
+    sourceToken++;
+    disposeSource();
+    const t = ctx.currentTime;
+    srcGain.gain.cancelScheduledValues(t);
+    srcGain.gain.setValueAtTime(0, t);
+    createSource();
+    srcGain.gain.linearRampToValueAtTime(1, t + 0.02);
+    state.playing = true;
+    syncTransport();
+    updateDevInfo();
+  }
+
+  function stop(){
+    if (!state.playing) return;
+    state.playing = false;
+    sourceToken++;
+    const t = ctx.currentTime;
+    srcGain.gain.cancelScheduledValues(t);
+    srcGain.gain.setValueAtTime(srcGain.gain.value, t);
+    srcGain.gain.linearRampToValueAtTime(0, t + 0.02);
+    const old = source;
+    source = null;
+    setTimeout(function(){
+      try { old.stop(); old.disconnect(); } catch(e){}
+    }, 32);
+    syncTransport();
+  }
+
+  function togglePlay(){ state.playing ? stop() : play(); }
+
+  function syncTransport(){
+    el.playBtn.classList.toggle('playing', state.playing);
+    el.playBtn.innerHTML = state.playing ? '&#9632; 停止播放' : '&#9654; 开始播放';
+    el.dot.classList.toggle('on', state.playing);
+    el.statusText.textContent = state.playing ? '运行中 · 持续输出' : '就绪 · 未输出';
+  }
+
+  /* ---- 波形切换（播放中平滑切换，不中断输出） ---- */
+  function setWaveform(k){
+    if (state.wave === k) return;
+    state.wave = k;
+    syncWaveUI();
+    updateAdvisory();
+    if (!state.playing || !ctx) return;
+
+    const token = ++sourceToken;
+    const t = ctx.currentTime;
+    srcGain.gain.cancelScheduledValues(t);
+    srcGain.gain.setValueAtTime(srcGain.gain.value, t);
+    srcGain.gain.linearRampToValueAtTime(0, t + 0.008);
+    setTimeout(function(){
+      if (token !== sourceToken || !state.playing || !ctx) return;
+      disposeSource();
+      createSource();
+      const t2 = ctx.currentTime;
+      srcGain.gain.cancelScheduledValues(t2);
+      srcGain.gain.setValueAtTime(0, t2);
+      srcGain.gain.linearRampToValueAtTime(1, t2 + 0.008);
+    }, 12);
+  }
+
+  /* ============================================================
+     界面构建
+     ============================================================ */
+  // 波形缩略图：用理想闭合式采样生成 SVG polyline，直观展示每种波形形状
+  function waveSample(kind, t){
+    t = t - Math.floor(t);
+    const TAU = Math.PI * 2;
+    switch (kind){
+      case 'sine':      return Math.sin(TAU * t);
+      case 'triangle':  return 4 * Math.abs(t - 0.5) - 1;
+      case 'sawtooth':  return 2 * t - 1;
+      case 'sawdown':   return 1 - 2 * t;
+      case 'square':    return t < 0.5 ? 1 : -1;
+      case 'pulse25':   return t < 0.25 ? 1 : -1/3;
+      case 'pulse10':   return t < 0.10 ? 1 : -1/9;
+      case 'halfrect':  return Math.max(0, Math.sin(TAU * t)) - 1 / Math.PI;
+      case 'fullrect':  return Math.abs(Math.sin(TAU * t)) - 2 / Math.PI;
+      case 'organ':     return Math.sin(TAU*t) + .5*Math.sin(2*TAU*t) + .34*Math.sin(3*TAU*t)
+                             + .25*Math.sin(4*TAU*t) + .2*Math.sin(5*TAU*t);
+      default: break;
+    }
+    // 噪声：确定性伪随机，保证缩略图稳定不闪烁
+    let seed = Math.floor(t * 256) + (kind === 'white' ? 11 : kind === 'pink' ? 29 : 47);
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    let v = (seed / 0x7fffffff) * 2 - 1;
+    if (kind === 'brown') v = v * 0.45 + Math.sin(TAU * t) * 0.25;
+    return v;
+  }
+
+  function waveIcon(kind){
+    const N = 120, pts = [], vals = [];
+    let max = 1e-6;
+    for (let i = 0; i <= N; i++){
+      const v = waveSample(kind, i / N);
+      vals.push(v);
+      max = Math.max(max, Math.abs(v));
+    }
+    for (let i = 0; i <= N; i++){
+      const x = (i / N * 60).toFixed(1);
+      const y = (10 - (vals[i] / max) * 8).toFixed(1);
+      pts.push(x + ',' + y);
+    }
+    return '<svg viewBox="0 0 60 20" aria-hidden="true"><polyline points="' + pts.join(' ') + '"/></svg>';
+  }
+
+  function buildWaveUI(){
+    WAVE_DEFS.forEach(function(group){
+      const box = document.createElement('div');
+      box.className = 'wave-group';
+      const label = document.createElement('div');
+      label.className = 'group-label';
+      label.textContent = group.group;
+      box.appendChild(label);
+      const row = document.createElement('div');
+      row.className = 'waves';
+      group.items.forEach(function(it){
+        const b = document.createElement('button');
+        b.className = 'wave';
+        b.dataset.wave = it.k;
+        b.type = 'button';
+        b.innerHTML = waveIcon(it.k) +
+          '<span class="txt"><span class="cn">' + it.cn + '</span><span class="en">' + it.en + '</span></span>';
+        b.addEventListener('click', function(){ setWaveform(it.k); });
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+      el.waveGroups.appendChild(box);
+    });
+  }
+
+  function syncWaveUI(){
+    document.querySelectorAll('.wave').forEach(function(b){
+      b.classList.toggle('active', b.dataset.wave === state.wave);
+    });
+    let cn = '', en = '';
+    WAVE_DEFS.forEach(function(g){ g.items.forEach(function(it){
+      if (it.k === state.wave){ cn = it.cn; en = it.en; }
+    });});
+    el.waveHint.textContent = '当前：' + cn + ' / ' + en;
+  }
+
+  function buildTicks(){
+    const vals = [1, 10, 100, 1000, 10000, 22000];
+    vals.forEach(function(f){
+      const s = document.createElement('span');
+      s.style.left = (freqToSlider(f) / SLIDER_MAX * 100) + '%';
+      s.textContent = f >= 1000 ? (f / 1000) + 'k' : String(f);
+      el.ticks.appendChild(s);
+    });
+    // 首尾刻度对齐，避免溢出容器
+    el.ticks.firstChild.style.left = '0%';
+    el.ticks.lastChild.style.left = '100%';
+  }
+
+  function buildPresets(){
+    PRESETS.forEach(function(f){
+      const b = document.createElement('button');
+      b.className = 'chip';
+      b.type = 'button';
+      b.textContent = f >= 1000 ? (f / 1000) + ' kHz' : f + ' Hz';
+      b.addEventListener('click', function(){ setFrequency(f, 'preset'); });
+      el.presets.appendChild(b);
+    });
+  }
+
+  function updateAdvisory(){
+    const sr = ctx ? ctx.sampleRate : 48000;
+    const f = state.freq;
+    let msg, cls = '';
+    if (isNoise(state.wave)){
+      msg = '当前为噪声信号：输出为全带宽，频率设置与波形缩略图中的周期性不适用，可用于测试声道平衡、底噪与频率响应。';
+    } else if (f > sr / 2){
+      cls = 'danger';
+      msg = '当前频率 ' + fmtFreq(f) + ' Hz 已超过设备 Nyquist 频率 ' + (sr/2) + ' Hz，实际输出会产生混叠失真，无法真实反映该频率。';
+    } else if (f > 20000){
+      cls = 'warn';
+      msg = '当前频率超过 20 kHz，已超出多数成年人听觉范围。请降低音量，长时间大音量高频可能损伤听力或高音单元。';
+    } else if (f < 20){
+      cls = 'warn';
+      msg = '当前为次低频（< 20 Hz），多数扬声器与耳机无法有效重放，可能只听到失真或完全无声，属于正常现象。';
+    } else if (!state.playing){
+      msg = '已就绪。建议先把左右声道音量调低（默认 30），再点击「开始播放」；声音将持续输出，直到点击「停止播放」。';
+    } else {
+      msg = '正在持续输出。可随时拖动滑杆、输入频率或切换波形，音频不会中断。若要单独测试某一声道，使用上方「仅左 / 仅右」快捷按钮。';
+    }
+    el.advisory.className = 'advisory' + (cls ? ' ' + cls : '');
+    el.advisory.textContent = msg;
+  }
+
+  /* ============================================================
+     示波器与电平表
+     ============================================================ */
+  function rms(buf, n){
+    let s = 0;
+    for (let i = 0; i < n; i++) s += buf[i] * buf[i];
+    return Math.sqrt(s / n);
+  }
+  const dbfs = v => v <= 1e-7 ? '-∞ dBFS' : (20 * Math.log10(v)).toFixed(1) + ' dBFS';
+
+  function drawTrace(g, buf, n, W, H, color){
+    g.beginPath();
+    for (let i = 0; i < n; i++){
+      const x = i / (n - 1) * W;
+      const y = H / 2 - buf[i] * (H / 2 - 10);
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.strokeStyle = color;
+    g.lineWidth = 1.3;
+    g.lineJoin = 'round';
+    g.stroke();
+  }
+
+  function render(){
+    requestAnimationFrame(render);
+    const c = el.scope, g = c.getContext('2d');
+    const W = c.clientWidth, H = c.clientHeight;
+    if (W === 0 || H === 0) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+    if (c.width !== pw || c.height !== ph){ c.width = pw; c.height = ph; }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, W, H);
+
+    // 网格
+    g.strokeStyle = '#e0e0e0'; g.lineWidth = 1;
+    g.beginPath();
+    for (let i = 1; i < 8; i++){ const x = Math.round(W * i / 8) + .5; g.moveTo(x, 0); g.lineTo(x, H); }
+    for (let i = 1; i < 4; i++){ const y = Math.round(H * i / 4) + .5; g.moveTo(0, y); g.lineTo(W, y); }
+    g.stroke();
+    g.strokeStyle = '#bbbbbb';
+    g.beginPath(); g.moveTo(0, H / 2 + .5); g.lineTo(W, H / 2 + .5); g.stroke();
+
+    if (analyserL){
+      analyserL.getFloatTimeDomainData(bufL);
+      analyserR.getFloatTimeDomainData(bufR);
+    } else {
+      bufL = bufL || new Float32Array(4096);
+      bufR = bufR || new Float32Array(4096);
+      bufL.fill(0); bufR.fill(0);
+    }
+
+    // 自适应时间窗：周期波形尽量显示约 4 个周期；噪声用固定窗口
+    let n = bufL.length;
+    const sr = ctx ? ctx.sampleRate : 48000;
+    if (isNoise(state.wave)){
+      n = Math.min(1200, bufL.length);
+      el.winInfo.textContent = '窗口 ' + (n / sr * 1000).toFixed(1) + ' ms · 全带宽噪声';
+    } else {
+      n = Math.round(sr * 4 / Math.max(state.freq, 1));
+      n = Math.max(16, Math.min(n, bufL.length));
+      el.winInfo.textContent = '窗口 ' + (n / sr * 1000).toFixed(1) + ' ms · ' +
+        (n / sr * state.freq).toFixed(1) + ' 周期';
+    }
+
+    drawTrace(g, bufL, n, W, H, '#000000');
+    drawTrace(g, bufR, n, W, H, '#777777');
+
+    if (!state.playing){
+      g.fillStyle = '#666666';
+      g.font = '12px sans-serif';
+      g.textAlign = 'center';
+      g.fillText('等待信号输出 · 点击下方「开始播放」', W / 2, H / 2 - 24);
+      g.textAlign = 'start';
+    }
+
+    const rL = rms(bufL, bufL.length), rR = rms(bufR, bufR.length);
+    el.barL.style.width = Math.min(100, rL * 140) + '%';
+    el.barR.style.width = Math.min(100, rR * 140) + '%';
+    el.rmsL.textContent = dbfs(rL);
+    el.rmsR.textContent = dbfs(rR);
+  }
+
+  /* ============================================================
+     事件绑定
+     ============================================================ */
+  el.freqSlider.addEventListener('input', function(){
+    setFrequency(sliderToFreq(+this.value), 'slider');
+  });
+
+  // 输入过程中实时响应，但不回写输入框；失焦 / 回车时格式化
+  el.freqInput.addEventListener('input', function(){
+    const v = parseFloat(this.value);
+    if (Number.isFinite(v)) setFrequency(clampFreq(v), 'number');
+  });
+  el.freqInput.addEventListener('change', function(){
+    setFrequency(this.value === '' ? state.freq : parseFloat(this.value), 'change');
+    this.value = String(round2(state.freq));
+  });
+  el.freqInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ this.blur(); }
+  });
+
+  el.btnHalf.addEventListener('click', function(){ setFrequency(state.freq / 2, 'buttons'); });
+  el.btnDouble.addEventListener('click', function(){ setFrequency(state.freq * 2, 'buttons'); });
+
+  el.volL.addEventListener('input', function(){ setVolume('L', +this.value); });
+  el.volR.addEventListener('input', function(){ setVolume('R', +this.value); });
+  el.link.addEventListener('change', function(){ state.link = this.checked; });
+
+  el.onlyL.addEventListener('click', function(){
+    state.link = false; state.muted = false;
+    state.volR = 0; if (state.volL === 0) state.volL = 30;
+    syncVolUI(); applyVolumes();
+  });
+  el.onlyR.addEventListener('click', function(){
+    state.link = false; state.muted = false;
+    state.volL = 0; if (state.volR === 0) state.volR = 30;
+    syncVolUI(); applyVolumes();
+  });
+  el.both.addEventListener('click', function(){
+    state.muted = false;
+    const v = Math.max(state.volL, state.volR) || 30;
+    state.volL = state.volR = v;
+    syncVolUI(); applyVolumes();
+  });
+  el.mute.addEventListener('click', function(){
+    state.muted = !state.muted;
+    syncVolUI(); applyVolumes();
+  });
+
+  el.playBtn.addEventListener('click', togglePlay);
+
+  document.addEventListener('keydown', function(e){
+    if (e.target.closest('input, select, textarea')) return; // 不干扰输入控件原生行为
+    if (e.code === 'Space'){
+      if (e.target.closest('button')) return;               // 让按钮自身的空格点击生效
+      e.preventDefault(); togglePlay();
+    } else if (e.key === 'ArrowLeft'){
+      e.preventDefault(); setFrequency(state.freq / 2, 'buttons');
+    } else if (e.key === 'ArrowRight'){
+      e.preventDefault(); setFrequency(state.freq * 2, 'buttons');
+    } else if (e.key === 'ArrowUp'){
+      e.preventDefault(); setFrequency(state.freq * 1.02, 'buttons');
+    } else if (e.key === 'ArrowDown'){
+      e.preventDefault(); setFrequency(state.freq / 1.02, 'buttons');
+    }
+  });
+
+  // 页面重新可见时若引擎被系统挂起，自动恢复，保证"一直播放"
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden && state.playing && ctx && ctx.state === 'suspended'){
+      ctx.resume().then(updateDevInfo);
+    }
+  });
+
+  /* ============================================================
+     初始化
+     ============================================================ */
+  buildTicks();
+  buildPresets();
+  buildWaveUI();
+  syncWaveUI();
+  syncVolUI();
+  syncTransport();
+  syncFreqUI('init');
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>
