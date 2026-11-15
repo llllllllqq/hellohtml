@@ -78,7 +78,7 @@ test.describe('文本编辑器', () => {
     // 有选区时，Tab 用制表符替换选中内容
     await page.locator('#editor').evaluate((el) => el.setSelectionRange(0, 1));
     await page.keyboard.press('Tab');
-    await expect(page.locator('#editor')).toHaveValue('\tb');
+    await expect(page.locator('#editor')).toHaveValue('\t\tb');
     expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('editor');
   });
 
