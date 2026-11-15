@@ -23,7 +23,7 @@ test.describe('音频发生器', () => {
     await page.goto(PAGE);
 
     await expect(page).toHaveTitle('音频信号发生器 · 离线双声道测试工具');
-    await expect(page.locator('.ver')).toHaveText('v1.5.0');
+    await expect(page.locator('.ver')).toHaveText(/^v\d+\.\d+\.\d+$/);
 
     await expect(page.locator('#freqBig')).toHaveText('440.00');
     await expect(page.locator('#freqInput')).toHaveValue('440');

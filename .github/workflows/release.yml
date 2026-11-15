@@ -26,7 +26,7 @@ jobs:
 
       - name: Check all page versions are identical and match the tag
         run: |
-          # 九个页面共用一个版本号；标签必须等于这个统一版本号。
+          # 所有页面共用一个版本号；标签必须等于这个统一版本号。
           # 校验逻辑与 tests/structure.spec.js 用的是同一个脚本。
           node scripts/versions.js check "${GITHUB_REF_NAME}"
 
