@@ -84,7 +84,7 @@ test.describe('文本编辑器', () => {
     expect(dialogMessage).toContain('未保存');
   });
 
-  test('打开 UTF-8 BOM 文件：识别编码、换行并规范化为 LF', async ({ page }) => {
+  test('打开 UTF-8 BOM 文件：识别编码、换行并规范化为 LF', async ({ page, isMobile }) => {
     await page.goto(PAGE);
 
     const buffer = Buffer.concat([
