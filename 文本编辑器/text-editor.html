@@ -9,17 +9,25 @@
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;overflow:hidden;font:14px/1.4 Arial,"Microsoft YaHei",sans-serif;background:#fff;color:#000}
-#bar{padding:6px;border-bottom:1px solid #999;background:#f0f0f0}
-button,select,input[type=text]{font:14px Arial,"Microsoft YaHei",sans-serif;min-height:42px;padding:7px 9px;margin:2px;border:1px solid #999;background:#fff;color:#000;max-width:100%;vertical-align:middle}
-button{cursor:pointer;min-width:42px}
+#bar{padding:5px;border-bottom:1px solid #999;background:#f0f0f0;display:flex;flex-wrap:wrap;align-items:center}
+button,select,input[type=text]{font:14px Arial,"Microsoft YaHei",sans-serif;min-height:40px;padding:6px 9px;margin:2px;border:1px solid #999;background:#fff;color:#000;max-width:100%;vertical-align:middle}
+button{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;min-width:40px}
 button:disabled{color:#aaa;cursor:default}
 button.on{background:#ddeeff;border-color:#36c}
+.ico{display:block;flex:0 0 auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.lbl{margin-left:6px}
+.lbl-short{display:none}
+#fsLabel{display:inline-block;min-width:22px;text-align:center;font-size:13px;color:#333}
 #bar label,#findbar label{font-size:13px;white-space:nowrap;margin:0 4px}
-#filebar{padding:5px 6px;border-bottom:1px solid #ccc;font-size:13px}
-#filebar .brand{font-weight:700;margin-right:10px;white-space:nowrap}
+#filebar{display:flex;align-items:center;flex-wrap:wrap;padding:4px 6px;border-bottom:1px solid #ccc;font-size:13px}
+#filebar label{margin-right:4px;white-space:nowrap}
 .ver{display:inline-block;font:11px/1.35 Consolas,"Courier New",monospace;border:1px solid #999;padding:1px 5px;margin-left:6px;color:#555;vertical-align:1px}
-#fileName{width:230px}
+#fileName{flex:1 1 160px;width:auto;min-width:100px;max-width:300px;margin:0}
 #hint{color:#a50;font-size:12px;margin-left:8px;word-break:break-all}
+#editorWrap{position:relative;display:flex;flex:1;min-height:0}
+#placeholder{position:absolute;left:10px;top:10px;right:10px;z-index:1;margin:0;pointer-events:none;-webkit-user-select:none;user-select:none;font:18px/1.5 Arial,"Microsoft YaHei",sans-serif;color:#9aa0a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#placeholder[hidden]{display:none}
+#placeholder .ver{color:#9aa0a6;border-color:#c9ced4;font-size:11px;vertical-align:1px}
 #findbar{padding:5px 6px;border-bottom:1px solid #ccc;background:#fafafa}
 #findbar.hide{display:none}
 #findbar input[type=text]{width:190px}
@@ -32,35 +40,38 @@ body.dragging #drop{display:block}
 #selftest{position:fixed;z-index:20;left:8px;right:8px;bottom:8px;max-height:50%;overflow:auto;margin:0;padding:10px;background:#111;color:#7dff9b;font:12px/1.5 Consolas,monospace;white-space:pre-wrap}
 #selftest[hidden]{display:none}
 @media (max-width:600px){
-  #filebar .brand{display:block;margin:0 0 3px}
-  #fileName{display:block;width:100%;margin:2px 0}
+  #bar{padding:3px}
+  button,select,input[type=text]{min-height:34px;padding:0 7px;margin:2px;font-size:13px}
+  button{min-width:34px}
+  .lbl{display:none}
+  .lbl-short{display:inline}
+  #fsLabel{min-width:16px;font-size:12px;margin:0 1px}
+  #filebar{padding:3px 6px}
   #findbar input[type=text]{display:block;width:100%;margin:2px 0}
-  #bar{padding:4px}
-  button,select,input[type=text]{min-height:44px}
+  #placeholder{font-size:16px;left:10px;top:10px;right:10px}
 }
 </style>
 </head>
 <body>
 
-<div id="bar">
-  <button id="bNew" data-act="new" title="Ctrl+N">新建</button>
-  <button id="bOpen" data-act="open" title="Ctrl+O">打开</button>
-  <button id="bSave" data-act="save" title="Ctrl+S · 保存为下载">保存</button>
-  <button id="bUndo" data-act="undo" title="Ctrl+Z">撤销</button>
-  <button id="bRedo" data-act="redo" title="Ctrl+Y">重做</button>
-  <button id="bFind" data-act="find" title="Ctrl+F / Ctrl+H">查找/替换</button>
-  <select id="encSel" title="保存时使用的字符编码"></select>
-  <select id="eolSel" title="保存时统一使用的换行符"></select>
-  <button id="bFontDown" data-act="fontDown" title="Ctrl+-">字号−</button>
+<div id="bar" role="toolbar" aria-label="编辑工具栏">
+  <button id="bOpen" data-act="open" title="打开文件（Ctrl+O）" aria-label="打开文件"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2 4.8h3.4l1.2 1.6H14v6.8H2z"></path></svg><span class="lbl">打开</span></button>
+  <button id="bSave" data-act="save" title="保存为下载（Ctrl+S）" aria-label="保存"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2.6v7.2"></path><path d="M5.2 7 8 9.8 10.8 7"></path><path d="M3 13h10"></path></svg><span class="lbl">保存</span></button>
+  <button id="bUndo" data-act="undo" title="撤销（Ctrl+Z）" aria-label="撤销"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M5.8 4.2 2.8 7.2l3 3"></path><path d="M2.8 7.2h6.6a3.4 3.4 0 0 1 0 6.8H6.6"></path></svg><span class="lbl">撤销</span></button>
+  <button id="bRedo" data-act="redo" title="重做（Ctrl+Y）" aria-label="重做"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10.2 4.2l3 3-3 3"></path><path d="M13.2 7.2H6.6a3.4 3.4 0 0 0 0 6.8H9.4"></path></svg><span class="lbl">重做</span></button>
+  <button id="bFind" data-act="find" title="查找/替换（Ctrl+F / Ctrl+H）" aria-label="查找替换"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7.2" cy="7.2" r="4.1"></circle><path d="m10.3 10.3 3.2 3.2"></path></svg><span class="lbl">查找/替换</span></button>
+  <select id="encSel" title="保存时使用的字符编码" aria-label="字符编码"></select>
+  <select id="eolSel" title="保存时统一使用的换行符" aria-label="换行符"></select>
+  <button id="bFontDown" data-act="fontDown" title="字号−（Ctrl+-）" aria-label="减小字号">A−</button>
   <span id="fsLabel">16</span>
-  <button id="bFontUp" data-act="fontUp" title="Ctrl++">字号＋</button>
-  <button id="bWrap" data-act="toggleWrap" class="on">自动换行</button>
-  <button id="bRedecode" data-act="redecode" title="用所选编码重新解读原始文件字节，修正乱码">重新解码</button>
+  <button id="bFontUp" data-act="fontUp" title="字号＋（Ctrl++）" aria-label="增大字号">A+</button>
+  <button id="bWrap" data-act="toggleWrap" class="on" title="自动换行" aria-label="自动换行" aria-pressed="true"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M12.8 4.2v4.4H4.6"></path><path d="m6.9 6.3-2.3 2.3 2.3 2.3"></path></svg><span class="lbl">自动换行</span></button>
+  <button id="bRedecode" data-act="redecode" title="用所选编码重新解读原始文件字节，修正乱码" aria-label="重新解码"><span class="lbl">重新解码</span><span class="lbl-short">重解</span></button>
 </div>
 
 <div id="filebar">
-  <span class="brand">本地文本编辑器 <span class="ver">v1.7.0</span></span>
-  文件名 <input id="fileName" type="text" value="未命名.txt" spellcheck="false">
+  <label for="fileName">文件名</label>
+  <input id="fileName" type="text" value="未命名.txt" spellcheck="false">
   <span id="hint"></span>
 </div>
 
@@ -78,7 +89,10 @@ body.dragging #drop{display:block}
   <button id="bReplaceAll" data-act="replaceAll">全部替换</button>
 </div>
 
-<textarea id="editor" wrap="soft" spellcheck="false"></textarea>
+<div id="editorWrap">
+  <textarea id="editor" wrap="soft" spellcheck="false" aria-label="文本编辑区"></textarea>
+  <div id="placeholder">本地文本编辑器 <span class="ver">v1.7.0</span></div>
+</div>
 <div id="status"></div>
 <div id="drop">松开以打开文件</div>
 <input type="file" id="fileInput" style="display:none">
@@ -292,6 +306,13 @@ function redo(){if(hist.idx<hist.stack.length-1){hist.idx++;applyState(hist.stac
 function countLines(t){var n=1;for(var i=0;i<t.length;i++)if(t.charCodeAt(i)===10)n++;return n;}
 function countChars(t){if(t.length>2000000)return t.length;var n=0;for(var i=0;i<t.length;i++){var c=t.charCodeAt(i);if(c<0xDC00||c>0xDFFF)n++;}return n;}
 
+/* ---------- 占位符（空文档时显示标题和版本号） ---------- */
+function syncPlaceholder(){
+  var p=$('#placeholder');
+  if(!p)return;
+  p.hidden=ed().value.length!==0;
+}
+
 /* ---------- 状态栏 / 提示 ---------- */
 var statusScheduled=false;
 function scheduleStatus(){
@@ -300,6 +321,7 @@ function scheduleStatus(){
   requestAnimationFrame(function(){statusScheduled=false;updateStatus();});
 }
 function updateStatus(){
+  syncPlaceholder();
   var e=ed(),v=e.value,s=e.selectionStart,en=e.selectionEnd,ln=1,last=-1;
   for(var i=0;i<s;i++)if(v.charCodeAt(i)===10){ln++;last=i;}
   var dirty=v!==state.savedText,parts=[];
@@ -325,10 +347,20 @@ function flashHint(msg,ms){
   clearTimeout(hintTimer);
   hintTimer=setTimeout(updateHint,ms||4500);
 }
+var compactMQ=window.matchMedia?window.matchMedia('(max-width: 600px)'):null;
+function isCompact(){return !!(compactMQ&&compactMQ.matches);}
 function updateSelects(){
-  $('#encSel').options[0].textContent='自动识别 · '+ENCS[state.detectedEnc].short;
-  $('#eolSel').options[0].textContent='自动识别 · '+EOLS[state.detectedEol].label+(state.mixedEol?'（原文件混合）':'');
+  var compact=isCompact();
+  $('#encSel').options[0].textContent=compact?'自':'自动识别 · '+ENCS[state.detectedEnc].short;
+  $('#eolSel').options[0].textContent=compact?'自':'自动识别 · '+EOLS[state.detectedEol].label+(state.mixedEol?'（原文件混合）':'');
   $('#encSel').value=state.enc;$('#eolSel').value=state.eol;
+}
+/* 窄屏把下拉选项换成短标签，避免下拉撑宽顶栏；宽屏保留完整说明 */
+function fillSelects(){
+  var compact=isCompact();
+  $('#encSel').innerHTML='<option value="auto">'+(compact?'自':'自动识别')+'</option>'+Object.keys(ENCS).filter(function(k){return k!=='auto';}).map(function(k){return '<option value="'+k+'">'+esc(compact?ENCS[k].short:ENCS[k].label)+'</option>';}).join('');
+  $('#eolSel').innerHTML='<option value="auto">'+(compact?'自':'自动识别')+'</option>'+Object.keys(EOLS).map(function(k){return '<option value="'+k+'">'+esc(compact?EOLS[k].label:EOLS[k].label+' · '+EOLS[k].desc)+'</option>';}).join('');
+  updateSelects();
 }
 function setContent(text,reset){
   var e=ed();
@@ -355,6 +387,7 @@ function applyWrap(){
   e.setAttribute('wrap',state.wrap?'soft':'off');
   e.className=state.wrap?'':'nowrap';
   $('#bWrap').className=state.wrap?'on':'';
+  $('#bWrap').setAttribute('aria-pressed',state.wrap?'true':'false');
 }
 
 /* ---------- 文件 ---------- */
@@ -577,7 +610,7 @@ function bindEvents(){
   ed().addEventListener('input',onInput);
   ed().addEventListener('compositionstart',function(){composing=true;});
   ed().addEventListener('compositionend',function(){composing=false;onInput();});
-  ['click','keyup','select','mouseup','touchend','focus'].forEach(function(t){ed().addEventListener(t,scheduleStatus);});
+  ['click','keyup','select','mouseup','touchend','focus','blur'].forEach(function(t){ed().addEventListener(t,scheduleStatus);});
 
   document.addEventListener('keydown',function(ev){
     var mod=ev.ctrlKey||ev.metaKey,k=ev.key.toLowerCase();
@@ -649,8 +682,11 @@ function runSelfTest(){
 }
 
 function init(){
-  $('#encSel').innerHTML='<option value="auto">自动识别</option>'+Object.keys(ENCS).filter(function(k){return k!=='auto';}).map(function(k){return '<option value="'+k+'">'+esc(ENCS[k].label)+'</option>';}).join('');
-  $('#eolSel').innerHTML='<option value="auto">自动识别</option>'+Object.keys(EOLS).map(function(k){return '<option value="'+k+'">'+esc(EOLS[k].label)+' · '+esc(EOLS[k].desc)+'</option>';}).join('');
+  fillSelects();
+  if(compactMQ){
+    if(compactMQ.addEventListener)compactMQ.addEventListener('change',fillSelects);
+    else if(compactMQ.addListener)compactMQ.addListener(fillSelects);
+  }
   loadPrefs();
   resetHistory();
   bindEvents();

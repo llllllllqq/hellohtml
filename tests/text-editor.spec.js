@@ -28,6 +28,9 @@ test.describe('文本编辑器', () => {
     await expect(page.locator('#findbar')).toHaveClass(/hide/);
     await expect(page.locator('#bUndo')).toBeDisabled();
     await expect(page.locator('#bRedo')).toBeDisabled();
+    await expect(page.locator('#placeholder')).toBeVisible();
+    await expect(page.locator('#placeholder')).toContainText('本地文本编辑器');
+    await expect(page.locator('#filebar .brand')).toHaveCount(0);
 
     await expect(page.locator('#status')).toContainText('行 1，列 1');
     await expect(page.locator('#status')).toContainText('共 1 行 / 0 字符');
@@ -40,13 +43,14 @@ test.describe('文本编辑器', () => {
     expect(errors).toEqual([]);
   });
 
-  test('输入、撤销、重做与新建确认', async ({ page }) => {
+  test('输入、撤销、重做，占位符随内容隐藏', async ({ page }) => {
     await page.goto(PAGE);
 
     await page.locator('#editor').fill('abc');
     await expect(page.locator('#status')).toContainText('● 已修改');
     await expect(page).toHaveTitle('● 未命名.txt · 文本编辑器');
     await expect(page.locator('#bUndo')).toBeEnabled();
+    await expect(page.locator('#placeholder')).toBeHidden();
 
     await page.locator('#bUndo').click();
     await expect(page.locator('#editor')).toHaveValue('');
@@ -56,12 +60,23 @@ test.describe('文本编辑器', () => {
     await page.locator('#bRedo').click();
     await expect(page.locator('#editor')).toHaveValue('abc');
 
+    // 清空后标题占位符重新出现
+    await page.locator('#editor').fill('');
+    await expect(page.locator('#placeholder')).toBeVisible();
+  });
+
+  test('新建：Ctrl+N 触发未保存确认', async ({ page, isMobile }) => {
+    test.skip(isMobile, '新建改为刷新页面或 Ctrl+N，只在桌面端测确认框');
+
+    await page.goto(PAGE);
+    await page.locator('#editor').fill('abc');
+
     let dialogMessage = '';
     page.once('dialog', async (dialog) => {
       dialogMessage = dialog.message();
       await dialog.accept();
     });
-    await page.locator('#bNew').click();
+    await page.keyboard.press('Control+n');
     await expect(page.locator('#editor')).toHaveValue('');
     await expect(page.locator('#fileName')).toHaveValue('未命名.txt');
     await expect(page).toHaveTitle('未命名.txt · 文本编辑器');
@@ -90,8 +105,8 @@ test.describe('文本编辑器', () => {
     await expect(page.locator('#status')).toContainText('✓ 已保存');
     await expect(page.locator('#hint')).toContainText('已打开 bom.txt');
     await expect(page.locator('#hint')).toContainText('含 BOM');
-    await expect(page.locator('#encSel option').first()).toHaveText('自动识别 · UTF-8 BOM');
-    await expect(page.locator('#eolSel option').first()).toHaveText('自动识别 · CRLF');
+    await expect(page.locator('#encSel option').first()).toHaveText(isMobile ? '自' : '自动识别 · UTF-8 BOM');
+    await expect(page.locator('#eolSel option').first()).toHaveText(isMobile ? '自' : '自动识别 · CRLF');
     await expect(page).toHaveTitle('bom.txt · 文本编辑器');
   });
 
@@ -190,6 +205,26 @@ test.describe('文本编辑器', () => {
     await page.locator('#regexChk').check();
     await page.locator('#findQ').fill('[');
     await expect(page.locator('#findInfo')).toHaveText('正则错误');
+  });
+
+  test('手机端顶栏用图标和短标签，高度受控', async ({ page, isMobile }) => {
+    test.skip(!isMobile, '只在移动端 project 运行');
+
+    await page.goto(PAGE);
+
+    await expect(page.locator('#bar .lbl').first()).toBeHidden();
+    await expect(page.locator('#bOpen')).toHaveAttribute('aria-label', '打开文件');
+    await expect(page.locator('#bWrap')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#bRedecode')).toContainText('重解');
+    await expect(page.locator('#encSel option').first()).toHaveText('自');
+
+    const barHeight = await page.locator('#bar').evaluate((el) => el.getBoundingClientRect().height);
+    const fileBarHeight = await page.locator('#filebar').evaluate((el) => el.getBoundingClientRect().height);
+    expect(barHeight).toBeLessThan(110);
+    expect(fileBarHeight).toBeLessThan(46);
+
+    await expect(page.locator('#placeholder')).toBeVisible();
+    await expectNoHorizontalScroll(page);
   });
 
   test('字号与自动换行偏好会保存', async ({ page }) => {
