@@ -17,7 +17,7 @@
 ### 测试
 
 - `tests/text-diff.spec.js`：统计断言改为 `+N` / `−N`（不再依赖「行」后缀与总行数），横向联动改测按钮的 `aria-pressed`，新增「手机端顶栏保持一行」用例（高度 < 44px 且统计与标题同一行）
-- 用例数在本次 CI 中确认（三种环境），结果记录在下方
+- CI：**284 passed / 181 skipped / 0 failed**，桌面 Chrome、Pixel 5、iPhone 13 全绿
 
 ## [1.6.0] - 2026-11-15
 
