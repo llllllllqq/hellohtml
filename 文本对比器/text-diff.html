@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>文本对比 · Diff</title>
+<style>
+  :root {
+    --fg: #1f2328;
+    --muted: #57606a;
+    --faint: #8c959f;
+    --border: #d0d7de;
+    --border-soft: #eaeef2;
+    --head-bg: #f6f8fa;
+    --row-h: 21px;
+    --add-bg: #e6ffec;
+    --add-ln: #ccffd8;
+    --add-fg: #116329;
+    --add-strong: #1a7f37;
+    --del-bg: #ffebe9;
+    --del-ln: #ffd8d6;
+    --del-fg: #82071e;
+    --del-strong: #cf222e;
+    --focus: #0969da;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #fff;
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  button { font-family: inherit; }
+  .hidden { display: none !important; }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-height: 0;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    background: var(--head-bg);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 5;
+  }
+  .brand {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .2px;
+    white-space: nowrap;
+    margin-right: 12px;
+  }
+  .brand-sub {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-left: 3px;
+  }
+  .brand .ver {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .seg {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: stretch;
+    margin-right: 8px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .seg button {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 0;
+    margin: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1;
+    padding: 7px 11px;
+    cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.active {
+    background: #eaeef2;
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .seg button:focus,
+  .btn:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+  .sync-toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 9px;
+    margin-right: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .sync-toggle:hover { background: #f3f4f6; }
+  .sync-toggle.on {
+    border-color: #0969da;
+    color: #0969da;
+    background: #f0f7ff;
+  }
+  .sync-toggle input {
+    margin: 0 6px 0 0;
+    cursor: pointer;
+  }
+  .stats {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .stats .stat {
+    margin-left: 8px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-add {
+    color: var(--add-fg);
+    background: #dafbe1;
+    border: 1px solid #aceebb;
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-weight: 600;
+  }
+  .stat-del {
+    color: var(--del-fg);
+    background: #ffebe9;
+    border: 1px solid #ffcecb;
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-weight: 600;
+  }
+  .stat-info { color: var(--faint); }
+
+  /* ---------- workspace ---------- */
+  .workspace {
+    flex: 1 1 auto;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+  }
+  .workspace.side { flex-direction: row; }
+  .workspace.stack { flex-direction: column; }
+  .workspace.side .pane + .pane { border-left: 1px solid var(--border); }
+  .workspace.stack .pane + .pane { border-top: 1px solid var(--border); }
+
+  .pane {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    background: #fff;
+  }
+  .pane-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 6px 10px;
+    background: #fbfcfd;
+    border-bottom: 1px solid var(--border);
+  }
+  .dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+  .dot-a { background: #0969da; }
+  .dot-b { background: #8250df; }
+  .file-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .file-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .file-meta {
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .head-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    margin-left: 8px;
+  }
+  .btn {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: #24292f;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .btn:hover { background: #f3f4f6; }
+  .btn:active { background: #eaeef2; }
+  .btn-icon {
+    padding: 6px 8px;
+    margin-left: 6px;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--muted);
+  }
+
+  /* ---------- code area ---------- */
+  .pane-body {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    contain: layout paint;
+    will-change: scroll-position;
+    scroll-behavior: auto;
+    overscroll-behavior: contain;
+    background: #fff;
+  }
+  .pane-body::-webkit-scrollbar { width: 10px; height: 10px; }
+  .pane-body::-webkit-scrollbar-track { background: #f6f8fa; }
+  .pane-body::-webkit-scrollbar-thumb {
+    background: #cfd6dd;
+    border-radius: 5px;
+    border: 2px solid #f6f8fa;
+  }
+  .pane-body::-webkit-scrollbar-thumb:hover { background: #b6bec7; }
+
+  .rows {
+    width: -webkit-max-content;
+    width: max-content;
+    min-width: 100%;
+    padding-bottom: 10px;
+    contain: layout style;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12.5px;
+  }
+  .row {
+    display: flex;
+    align-items: stretch;
+    height: var(--row-h);
+    line-height: var(--row-h);
+  }
+  .row .ln {
+    flex: 0 0 auto;
+    width: var(--lnw, 44px);
+    padding-right: 10px;
+    text-align: right;
+    font-size: 11px;
+    color: var(--faint);
+    background: var(--head-bg);
+    border-right: 1px solid #eef1f4;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+  }
+  .row .sign {
+    flex: 0 0 18px;
+    width: 18px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .row .code {
+    flex: 1 1 auto;
+    padding-right: 18px;
+    white-space: pre;
+    -moz-tab-size: 4;
+    tab-size: 4;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .row.eq { background: #fff; }
+  .row.del { background: var(--del-bg); }
+  .row.del .ln {
+    background: var(--del-ln);
+    color: var(--del-fg);
+    border-right-color: #ffcecb;
+  }
+  .row.del .sign { color: var(--del-strong); }
+  .row.add { background: var(--add-bg); }
+  .row.add .ln {
+    background: var(--add-ln);
+    color: var(--add-fg);
+    border-right-color: #aceebb;
+  }
+  .row.add .sign { color: var(--add-strong); }
+  .row.filler { background: #fafbfc; }
+  .row.filler .ln { background: #f6f8fa; border-right-color: #eef1f4; }
+  .row.plain { background: #fff; }
+
+  .row.gap {
+    height: 30px;
+    line-height: 30px;
+    background: #f6f8fa;
+    border-top: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .row.gap .gap-label {
+    flex: 1 1 auto;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 11px;
+    color: var(--faint);
+    letter-spacing: .2px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* ---------- empty state ---------- */
+  .empty {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    background: #fff;
+    color: var(--muted);
+    cursor: default;
+  }
+  .empty-icon {
+    font-size: 30px;
+    line-height: 1;
+    color: #aab2bb;
+    margin-bottom: 12px;
+  }
+  .empty-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #24292f;
+  }
+  .empty-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--faint);
+  }
+
+  /* ---------- inline text editor ---------- */
+  .editor-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+  }
+  .editor-input {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 12px 14px;
+    border: 0;
+    resize: none;
+    background: #fff;
+    color: var(--fg);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    -moz-tab-size: 4;
+    tab-size: 4;
+    outline: none;
+    overflow: auto;
+  }
+  .editor-input:focus { box-shadow: inset 0 0 0 2px rgba(9, 105, 218, .35); }
+  .editor-input::placeholder { color: #aab2bb; }
+  .editor-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    border-top: 1px solid var(--border-soft);
+    background: #fbfcfd;
+  }
+  .btn-primary {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 1px solid #1f883d;
+    background: #1f883d;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1;
+    padding: 8px 16px;
+    cursor: pointer;
+  }
+  .btn-primary:hover { background: #1a7f37; }
+  .btn-primary:active { background: #187733; }
+  .btn-primary:disabled {
+    opacity: .45;
+    cursor: default;
+    background: #1f883d;
+  }
+  .btn-primary:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+  .editor-hint {
+    margin-left: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--faint);
+  }
+  .pane.dragover .pane-body {
+    outline: 2px dashed var(--focus);
+    outline-offset: -8px;
+    background: #f5faff;
+  }
+  .pane.dragover .empty { background: transparent; }
+
+  .file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* ---------- mobile ---------- */
+  @media (max-width: 760px) {
+    :root { --row-h: 20px; }
+    .topbar { padding: 6px 8px; }
+    .brand { font-size: 13px; margin-right: 8px; }
+    .brand-sub { display: none; }
+    .seg { margin-right: 6px; }
+    .seg button { padding: 6px 9px; font-size: 11.5px; }
+    .sync-toggle {
+      height: 26px;
+      padding: 0 8px;
+      margin-right: 6px;
+      font-size: 11.5px;
+    }
+    .sync-toggle input { margin-right: 5px; }
+    .stats {
+      flex-basis: 100%;
+      justify-content: flex-start;
+      margin-top: 6px;
+      font-size: 11px;
+    }
+    .stats .stat { margin-left: 0; margin-right: 8px; }
+    .pane-head { min-height: 40px; padding: 4px 8px; }
+    .file-name { font-size: 12px; }
+    .file-meta { font-size: 10.5px; }
+    .btn { padding: 5px 8px; font-size: 11.5px; }
+    .btn-icon { padding: 5px 7px; font-size: 13px; }
+    .rows { font-size: 12px; }
+    .row .ln { font-size: 10.5px; padding-right: 7px; }
+    .row .code { padding-right: 12px; }
+    .row .sign { flex-basis: 16px; width: 16px; font-size: 11px; }
+    .empty-icon { font-size: 26px; }
+    .empty-title { font-size: 13px; }
+    .editor-input { padding: 10px; font-size: 12px; }
+    .editor-foot { padding: 7px 8px; }
+    .btn-primary { padding: 7px 14px; font-size: 11.5px; }
+    .editor-hint { margin-left: 8px; font-size: 10.5px; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">文本对比<span class="brand-sub">Diff</span> <span class="ver">v1.6.0</span></div>
+    <div class="seg" id="layoutSeg" role="group" aria-label="布局切换">
+      <button type="button" data-layout="side" class="active">左右</button>
+      <button type="button" data-layout="stack">上下</button>
+    </div>
+    <div class="seg" id="viewSeg" role="group" aria-label="显示范围">
+      <button type="button" data-view="all" class="active">全部</button>
+      <button type="button" data-view="diff">仅差异</button>
+    </div>
+    <label class="sync-toggle" id="syncToggle" title="勾选后左右两栏横向和纵向都联动滚动；默认仅纵向">
+      <input type="checkbox" id="syncX">横向联动
+    </label>
+    <div class="stats" id="stats" aria-live="polite"></div>
+  </header>
+
+  <main class="workspace side" id="workspace">
+    <section class="pane" id="paneA">
+      <div class="pane-head">
+        <span class="dot dot-a"></span>
+        <div class="file-info">
+          <div class="file-name" id="nameA">未选择文件</div>
+          <div class="file-meta" id="metaA">左侧文档</div>
+        </div>
+        <div class="head-actions">
+          <button type="button" class="btn" id="openA">打开文件</button>
+          <button type="button" class="btn btn-icon hidden" id="clearA" title="清除左侧文件" aria-label="清除左侧文件">×</button>
+        </div>
+      </div>
+      <div class="pane-body" id="bodyA">
+        <div class="rows" id="rowsA"></div>
+        <div class="empty hidden" id="emptyA">
+          <div class="empty-icon"></div>
+          <div class="empty-title"></div>
+          <div class="empty-hint"></div>
+        </div>
+        <div class="editor-panel" id="editorA">
+          <textarea class="editor-input" id="textA" placeholder="在此输入或粘贴纯文本，点击「提交」开始对比…" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="输入左侧纯文本"></textarea>
+          <div class="editor-foot">
+            <button type="button" class="btn-primary" id="submitA" disabled>提交</button>
+            <span class="editor-hint">粘贴仅保留纯文本 · 也可用右上角「打开文件」</span>
+          </div>
+        </div>
+      </div>
+      <input type="file" class="file-input" id="fileA" tabindex="-1" aria-hidden="true">
+    </section>
+
+    <section class="pane" id="paneB">
+      <div class="pane-head">
+        <span class="dot dot-b"></span>
+        <div class="file-info">
+          <div class="file-name" id="nameB">未选择文件</div>
+          <div class="file-meta" id="metaB">右侧文档</div>
+        </div>
+        <div class="head-actions">
+          <button type="button" class="btn" id="openB">打开文件</button>
+          <button type="button" class="btn btn-icon hidden" id="clearB" title="清除右侧文件" aria-label="清除右侧文件">×</button>
+        </div>
+      </div>
+      <div class="pane-body" id="bodyB">
+        <div class="rows" id="rowsB"></div>
+        <div class="empty hidden" id="emptyB">
+          <div class="empty-icon"></div>
+          <div class="empty-title"></div>
+          <div class="empty-hint"></div>
+        </div>
+        <div class="editor-panel" id="editorB">
+          <textarea class="editor-input" id="textB" placeholder="在此输入或粘贴纯文本，点击「提交」开始对比…" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="输入右侧纯文本"></textarea>
+          <div class="editor-foot">
+            <button type="button" class="btn-primary" id="submitB" disabled>提交</button>
+            <span class="editor-hint">粘贴仅保留纯文本 · 也可用右上角「打开文件」</span>
+          </div>
+        </div>
+      </div>
+      <input type="file" class="file-input" id="fileB" tabindex="-1" aria-hidden="true">
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ===================== diff core start ===================== */
+
+  function splitLines(text) {
+    if (!text) return [];
+    var lines = text.split(/\r\n|\n|\r/);
+    if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+    return lines;
+  }
+
+  function internLines(lines, map) {
+    var out = new Int32Array(lines.length);
+    for (var i = 0; i < lines.length; i++) {
+      var s = lines[i];
+      var id = map.get(s);
+      if (id === undefined) {
+        id = map.size;
+        map.set(s, id);
+      }
+      out[i] = id;
+    }
+    return out;
+  }
+
+  function hasCommonLine(a, b) {
+    var set = new Set();
+    var i;
+    for (i = 0; i < a.length; i++) set.add(a[i]);
+    for (i = 0; i < b.length; i++) {
+      if (set.has(b[i])) return true;
+    }
+    return false;
+  }
+
+  function coarseOps(n, m) {
+    var ops = [];
+    var i;
+    for (i = 0; i < n; i++) ops.push(1);
+    for (i = 0; i < m; i++) ops.push(2);
+    return ops;
+  }
+
+  /* Myers O(ND) diff over interned integer lines.
+     Returns an array of ops: 0 = equal, 1 = delete, 2 = insert.
+     Returns null when the edit distance exceeds `cap`. */
+  function myers(a, b, cap) {
+    var n = a.length;
+    var m = b.length;
+    var max = n + m;
+    var off = max;
+    var v = new Int32Array(2 * max + 1);
+    var trace = [];
+    var found = -1;
+    var d;
+    var k;
+    var limit = Math.min(max, cap);
+
+    for (d = 0; d <= limit; d++) {
+      trace.push(v.slice(off - d, off + d + 1));
+      for (k = -d; k <= d; k += 2) {
+        var x;
+        if (k === -d || (k !== d && v[off + k - 1] < v[off + k + 1])) {
+          x = v[off + k + 1];
+        } else {
+          x = v[off + k - 1] + 1;
+        }
+        var y = x - k;
+        while (x < n && y < m && a[x] === b[y]) {
+          x++;
+          y++;
+        }
+        v[off + k] = x;
+        if (x >= n && y >= m) {
+          found = d;
+          break;
+        }
+      }
+      if (found !== -1) break;
+    }
+
+    if (found === -1) return null;
+
+    var rev = [];
+    var X = n;
+    var Y = m;
+
+    for (d = found; d >= 0; d--) {
+      var vd = trace[d];
+      k = X - Y;
+      if (d === 0) {
+        while (X > 0 && Y > 0) {
+          rev.push(0);
+          X--;
+          Y--;
+        }
+        break;
+      }
+      var prevK;
+      if (k === -d || (k !== d && vd[k - 1 + d] < vd[k + 1 + d])) {
+        prevK = k + 1;
+      } else {
+        prevK = k - 1;
+      }
+      var prevX = vd[prevK + d];
+      var prevY = prevX - prevK;
+      while (X > prevX && Y > prevY) {
+        rev.push(0);
+        X--;
+        Y--;
+      }
+      if (X === prevX) {
+        rev.push(2);
+        Y--;
+      } else {
+        rev.push(1);
+        X--;
+      }
+    }
+
+    rev.reverse();
+    return rev;
+  }
+
+  function diffOps(a, b) {
+    var n = a.length;
+    var m = b.length;
+    var maxPre = Math.min(n, m);
+    var pre = 0;
+    while (pre < maxPre && a[pre] === b[pre]) pre++;
+
+    var suf = 0;
+    while (suf < maxPre - pre && a[n - 1 - suf] === b[m - 1 - suf]) suf++;
+
+    var ops = [];
+    var i;
+    for (i = 0; i < pre; i++) ops.push(0);
+
+    var na = n - pre - suf;
+    var nb = m - pre - suf;
+
+    if (na > 0 && nb > 0) {
+      var sa = a.subarray(pre, pre + na);
+      var sb = b.subarray(pre, pre + nb);
+      var mid = null;
+      if (!hasCommonLine(sa, sb)) {
+        mid = coarseOps(na, nb);
+      } else {
+        var total = na + nb;
+        var cap = Math.floor(40000000 / (total + 1));
+        if (cap > 2000) cap = 2000;
+        if (cap < 300) cap = 300;
+        mid = myers(sa, sb, cap);
+        if (!mid) mid = coarseOps(na, nb);
+      }
+      for (i = 0; i < mid.length; i++) ops.push(mid[i]);
+    } else if (na > 0) {
+      for (i = 0; i < na; i++) ops.push(1);
+    } else if (nb > 0) {
+      for (i = 0; i < nb; i++) ops.push(2);
+    }
+
+    for (i = 0; i < suf; i++) ops.push(0);
+    return ops;
+  }
+
+  function rowsFromOps(aLines, bLines, ops) {
+    var rows = [];
+    var i = 0;
+    var j = 0;
+    var k = 0;
+
+    while (k < ops.length) {
+      if (ops[k] === 0) {
+        rows.push({
+          type: 'equal',
+          aNum: i + 1,
+          bNum: j + 1,
+          text: aLines[i]
+        });
+        i++;
+        j++;
+        k++;
+      } else {
+        var dels = [];
+        var inss = [];
+        while (k < ops.length && ops[k] !== 0) {
+          if (ops[k] === 1) {
+            dels.push(i);
+            i++;
+          } else {
+            inss.push(j);
+            j++;
+          }
+          k++;
+        }
+        var len = Math.max(dels.length, inss.length);
+        for (var p = 0; p < len; p++) {
+          var hasA = p < dels.length;
+          var hasB = p < inss.length;
+          if (hasA && hasB) {
+            rows.push({
+              type: 'change',
+              aNum: dels[p] + 1,
+              bNum: inss[p] + 1,
+              aText: aLines[dels[p]],
+              bText: bLines[inss[p]]
+            });
+          } else if (hasA) {
+            rows.push({
+              type: 'del',
+              aNum: dels[p] + 1,
+              aText: aLines[dels[p]]
+            });
+          } else {
+            rows.push({
+              type: 'ins',
+              bNum: inss[p] + 1,
+              bText: bLines[inss[p]]
+            });
+          }
+        }
+      }
+    }
+
+    return rows;
+  }
+
+  function buildDiff(linesA, linesB) {
+    var map = new Map();
+    var a = internLines(linesA, map);
+    var b = internLines(linesB, map);
+    var ops = diffOps(a, b);
+    return rowsFromOps(linesA, linesB, ops);
+  }
+
+  /* ===================== diff core end ===================== */
+
+  function closest(el, selector) {
+    while (el && el.nodeType === 1) {
+      if (el.matches && el.matches(selector)) return el;
+      el = el.parentNode;
+    }
+    return null;
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function fmtNum(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var els = {
+    app: $('app'),
+    workspace: $('workspace'),
+    layoutSeg: $('layoutSeg'),
+    viewSeg: $('viewSeg'),
+    syncToggle: $('syncToggle'),
+    syncX: $('syncX'),
+    stats: $('stats'),
+    panes: { a: $('paneA'), b: $('paneB') },
+    bodies: { a: $('bodyA'), b: $('bodyB') },
+    rows: { a: $('rowsA'), b: $('rowsB') },
+    empties: { a: $('emptyA'), b: $('emptyB') },
+    editors: { a: $('editorA'), b: $('editorB') },
+    textareas: { a: $('textA'), b: $('textB') },
+    submits: { a: $('submitA'), b: $('submitB') },
+    names: { a: $('nameA'), b: $('nameB') },
+    metas: { a: $('metaA'), b: $('metaB') },
+    opens: { a: $('openA'), b: $('openB') },
+    clears: { a: $('clearA'), b: $('clearB') },
+    inputs: { a: $('fileA'), b: $('fileB') }
+  };
+
+  var state = {
+    files: { a: null, b: null },
+    rows: null,
+    layout: 'side',
+    view: 'all',
+    syncX: false,
+    diff: { add: 0, del: 0 },
+    busy: false,
+    error: '',
+    token: 0,
+    lnw: 44
+  };
+
+  var loadSeq = { a: 0, b: 0 };
+  var layoutTouched = false;
+  var syncRaf = 0;
+  var syncFrom = null;
+  var syncTo = null;
+  var syncLockedPane = null;
+
+  function gutterWidth() {
+    var max = 1;
+    if (state.files.a) max = Math.max(max, state.files.a.lines.length);
+    if (state.files.b) max = Math.max(max, state.files.b.lines.length);
+    var digits = String(max).length;
+    return Math.max(36, digits * 7 + 14);
+  }
+
+  function plainRows(lines) {
+    var out = new Array(lines.length);
+    for (var i = 0; i < lines.length; i++) {
+      out[i] = { type: 'plain', num: i + 1, text: lines[i] };
+    }
+    return out;
+  }
+
+  function filterRows(rows) {
+    var out = [];
+    var run = 0;
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.type === 'equal') {
+        run++;
+      } else {
+        if (run > 0) {
+          out.push({ type: 'gap', count: run });
+          run = 0;
+        }
+        out.push(r);
+      }
+    }
+    if (run > 0) out.push({ type: 'gap', count: run });
+    while (out.length && out[0].type === 'gap') out.shift();
+    while (out.length && out[out.length - 1].type === 'gap') out.pop();
+    return out;
+  }
+
+  function countStats(rows) {
+    var add = 0;
+    var del = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var t = rows[i].type;
+      if (t === 'ins') {
+        add++;
+      } else if (t === 'del') {
+        del++;
+      } else if (t === 'change') {
+        add++;
+        del++;
+      }
+    }
+    return { add: add, del: del };
+  }
+
+  function rowHtml(cls, sign, num, text) {
+    return '<div class="row ' + cls + '">' +
+      '<span class="ln">' + num + '</span>' +
+      '<span class="sign">' + sign + '</span>' +
+      '<span class="code">' + escapeHtml(text) + '</span>' +
+      '</div>';
+  }
+
+  function fillerHtml() {
+    return '<div class="row filler"><span class="ln"></span><span class="sign"></span><span class="code"></span></div>';
+  }
+
+  function buildRowsHtml(side, rows) {
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.type === 'gap') {
+        out.push('<div class="row gap"><span class="gap-label">⋯ ' + r.count + ' 行未修改</span></div>');
+      } else if (r.type === 'plain') {
+        out.push(rowHtml('plain', '', r.num, r.text));
+      } else if (r.type === 'equal') {
+        out.push(rowHtml('eq', '', side === 'a' ? r.aNum : r.bNum, r.text));
+      } else if (r.type === 'change') {
+        if (side === 'a') {
+          out.push(rowHtml('del', '−', r.aNum, r.aText));
+        } else {
+          out.push(rowHtml('add', '+', r.bNum, r.bText));
+        }
+      } else if (r.type === 'del') {
+        if (side === 'a') {
+          out.push(rowHtml('del', '−', r.aNum, r.aText));
+        } else {
+          out.push(fillerHtml());
+        }
+      } else if (r.type === 'ins') {
+        if (side === 'a') {
+          out.push(fillerHtml());
+        } else {
+          out.push(rowHtml('add', '+', r.bNum, r.bText));
+        }
+      }
+    }
+    return out.join('');
+  }
+
+  function setOverlay(side, title, hint, icon) {
+    var el = els.empties[side];
+    el.querySelector('.empty-icon').textContent = icon;
+    el.querySelector('.empty-title').textContent = title;
+    el.querySelector('.empty-hint').textContent = hint;
+    el.classList.remove('hidden');
+  }
+
+  function updateSubmitState(side) {
+    var ta = els.textareas[side];
+    var btn = els.submits[side];
+    if (!ta || !btn) return;
+    btn.disabled = ta.value.length === 0;
+  }
+
+  function insertPlainText(ta, text) {
+    if (!text) return;
+    var start = ta.selectionStart;
+    var end = ta.selectionEnd;
+    if (typeof start === 'number' && typeof end === 'number') {
+      ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+      var pos = start + text.length;
+      try { ta.setSelectionRange(pos, pos); } catch (e) {}
+    } else {
+      ta.value += text;
+    }
+    ta.scrollTop = ta.scrollHeight;
+  }
+
+  function submitText(side) {
+    var ta = els.textareas[side];
+    var text = ta.value;
+    if (!text.length) return;
+    state.files[side] = {
+      name: '手动输入文本',
+      size: 0,
+      lines: splitLines(text),
+      manual: true
+    };
+    ta.value = '';
+    updateSubmitState(side);
+    scheduleDiff();
+  }
+
+  function renderPane(side) {
+    var file = state.files[side];
+    var rowsEl = els.rows[side];
+    var nameEl = els.names[side];
+    var metaEl = els.metas[side];
+    var openBtn = els.opens[side];
+    var clearBtn = els.clears[side];
+
+    if (!file) {
+      rowsEl.innerHTML = '';
+      nameEl.textContent = '未选择文件';
+      metaEl.textContent = '可直接输入纯文本';
+      openBtn.textContent = '打开文件';
+      clearBtn.classList.add('hidden');
+      els.empties[side].classList.add('hidden');
+      els.editors[side].classList.remove('hidden');
+      updateSubmitState(side);
+      return;
+    }
+
+    els.editors[side].classList.add('hidden');
+    nameEl.textContent = file.name;
+    metaEl.textContent = fmtNum(file.lines.length) + ' 行 · ' +
+      (file.manual ? '纯文本' : formatBytes(file.size));
+    openBtn.textContent = '更换文件';
+    clearBtn.classList.remove('hidden');
+
+    if (!state.rows && file.lines.length === 0) {
+      rowsEl.innerHTML = '';
+      setOverlay(side, '空文件', '这个文件没有内容', '∅');
+      return;
+    }
+
+    var list;
+    if (state.rows) {
+      list = state.view === 'all' ? state.rows : filterRows(state.rows);
+    } else {
+      list = plainRows(file.lines);
+    }
+
+    if (state.rows && list.length === 0) {
+      rowsEl.innerHTML = '';
+      setOverlay(side, '内容一致', '两个文件没有差异', '✓');
+      return;
+    }
+
+    els.empties[side].classList.add('hidden');
+    rowsEl.innerHTML = buildRowsHtml(side, list);
+    rowsEl.style.setProperty('--lnw', state.lnw + 'px');
+  }
+
+  function renderStats() {
+    var s = els.stats;
+    if (!state.files.a || !state.files.b) {
+      var hasOne = !!(state.files.a || state.files.b);
+      s.innerHTML = '<span class="stat stat-info">' +
+        (hasOne ? '在另一侧输入文本并提交，或打开文件' : '在两侧输入文本并提交，或打开文件进行对比') +
+        '</span>';
+      return;
+    }
+    if (state.busy) {
+      s.innerHTML = '<span class="stat stat-info">正在对比…</span>';
+      return;
+    }
+    if (state.error) {
+      s.innerHTML = '<span class="stat stat-info">' + escapeHtml(state.error) + '</span>';
+      return;
+    }
+    var html = '';
+    if (state.diff.add === 0 && state.diff.del === 0) {
+      html += '<span class="stat stat-info">两个文件内容一致</span>';
+    } else {
+      html += '<span class="stat stat-add">+' + fmtNum(state.diff.add) + ' 行</span>';
+      html += '<span class="stat stat-del">−' + fmtNum(state.diff.del) + ' 行</span>';
+    }
+    html += '<span class="stat stat-info">' + fmtNum(state.files.a.lines.length) + ' 行 × ' +
+      fmtNum(state.files.b.lines.length) + ' 行</span>';
+    s.innerHTML = html;
+  }
+
+  function render() {
+    state.lnw = gutterWidth();
+    renderPane('a');
+    renderPane('b');
+    renderStats();
+    els.bodies.a.scrollTop = 0;
+    els.bodies.b.scrollTop = 0;
+  }
+
+  function scheduleDiff() {
+    var token = ++state.token;
+    state.rows = null;
+    state.busy = false;
+    state.error = '';
+
+    if (!state.files.a || !state.files.b) {
+      render();
+      return;
+    }
+
+    state.busy = true;
+    render();
+
+    setTimeout(function () {
+      if (token !== state.token) return;
+      var rows;
+      try {
+        rows = buildDiff(state.files.a.lines, state.files.b.lines);
+      } catch (err) {
+        if (token !== state.token) return;
+        state.busy = false;
+        state.error = '对比失败：' + (err && err.message ? err.message : String(err));
+        render();
+        return;
+      }
+      if (token !== state.token) return;
+      state.rows = rows;
+      state.busy = false;
+      state.diff = countStats(rows);
+      render();
+    }, 30);
+  }
+
+  function loadFile(side, file) {
+    var seq = ++loadSeq[side];
+    var reader = new FileReader();
+
+    reader.onload = function () {
+      if (seq !== loadSeq[side]) return;
+      var text = typeof reader.result === 'string' ? reader.result : '';
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      state.files[side] = {
+        name: file.name || '未命名文件',
+        size: file.size || 0,
+        lines: splitLines(text)
+      };
+      els.textareas[side].value = '';
+      updateSubmitState(side);
+      scheduleDiff();
+    };
+
+    reader.onerror = function () {
+      if (seq !== loadSeq[side]) return;
+      state.files[side] = null;
+      state.error = '文件读取失败，请重试';
+      render();
+    };
+
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  /* Vertical-only scroll sync, coalesced to one write per frame.
+     The target ignores the scroll event caused by that write, so the two
+     panes cannot ping-pong scroll events. */
+  function onPaneScroll(from, to) {
+    if (syncLockedPane === from) return;
+    syncFrom = from;
+    syncTo = to;
+    if (!syncRaf) syncRaf = requestAnimationFrame(flushScrollSync);
+  }
+
+  function flushScrollSync() {
+    syncRaf = 0;
+    var from = syncFrom;
+    var to = syncTo;
+    syncFrom = null;
+    syncTo = null;
+    if (!from || !to) return;
+
+    var top = from.scrollTop;
+    var needTop = Math.abs(to.scrollTop - top) >= 1;
+    var needLeft = false;
+    var left = 0;
+    if (state.syncX) {
+      left = from.scrollLeft;
+      needLeft = Math.abs(to.scrollLeft - left) >= 1;
+    }
+    if (!needTop && !needLeft) return;
+
+    syncLockedPane = to;
+    if (needTop) to.scrollTop = top;
+    if (needLeft) to.scrollLeft = left;
+
+    requestAnimationFrame(function () {
+      if (syncLockedPane === to) syncLockedPane = null;
+
+      var maxTop = to.scrollHeight - to.clientHeight;
+      if (maxTop < 0) maxTop = 0;
+      var topGap = Math.abs(to.scrollTop - from.scrollTop) >= 1 &&
+        from.scrollTop <= maxTop + 1;
+
+      var leftGap = false;
+      if (state.syncX) {
+        var maxLeft = to.scrollWidth - to.clientWidth;
+        if (maxLeft < 0) maxLeft = 0;
+        leftGap = Math.abs(to.scrollLeft - from.scrollLeft) >= 1 &&
+          from.scrollLeft <= maxLeft + 1;
+      }
+
+      /* Only catch up when the target can actually reach the source
+         position; otherwise an unscrollable pane would loop forever. */
+      if (topGap || leftGap) {
+        syncFrom = from;
+        syncTo = to;
+        if (!syncRaf) syncRaf = requestAnimationFrame(flushScrollSync);
+      }
+    });
+  }
+
+  function bindDrop(pane, side) {
+    function hasFiles(e) {
+      var dt = e.dataTransfer;
+      if (!dt) return false;
+      if (dt.types) {
+        for (var i = 0; i < dt.types.length; i++) {
+          if (dt.types[i] === 'Files') return true;
+        }
+      }
+      return false;
+    }
+
+    pane.addEventListener('dragenter', function (e) {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      pane.classList.add('dragover');
+    });
+    pane.addEventListener('dragover', function (e) {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = 'copy'; } catch (err) {}
+      pane.classList.add('dragover');
+    });
+    pane.addEventListener('dragleave', function (e) {
+      if (e.target === pane || !pane.contains(e.relatedTarget)) {
+        pane.classList.remove('dragover');
+      }
+    });
+    pane.addEventListener('drop', function (e) {
+      e.preventDefault();
+      pane.classList.remove('dragover');
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (files && files.length) loadFile(side, files[0]);
+    });
+  }
+
+  function updateSeg(seg, attr, value) {
+    var btns = seg.getElementsByTagName('button');
+    for (var i = 0; i < btns.length; i++) {
+      if (btns[i].getAttribute(attr) === value) {
+        btns[i].classList.add('active');
+      } else {
+        btns[i].classList.remove('active');
+      }
+    }
+  }
+
+  function setLayout(layout) {
+    state.layout = layout;
+    if (layout === 'stack') {
+      els.workspace.classList.add('stack');
+      els.workspace.classList.remove('side');
+    } else {
+      els.workspace.classList.add('side');
+      els.workspace.classList.remove('stack');
+    }
+    updateSeg(els.layoutSeg, 'data-layout', layout);
+    fitHeight();
+  }
+
+  function setView(view) {
+    state.view = view;
+    updateSeg(els.viewSeg, 'data-view', view);
+    render();
+  }
+
+  function fitHeight() {
+    var h = window.innerHeight || document.documentElement.clientHeight || 600;
+    els.app.style.height = h + 'px';
+  }
+
+  function bind() {
+    var sides = ['a', 'b'];
+    for (var i = 0; i < sides.length; i++) {
+      (function (side) {
+        els.opens[side].addEventListener('click', function () {
+          els.inputs[side].click();
+        });
+
+        els.textareas[side].addEventListener('input', function () {
+          updateSubmitState(side);
+        });
+
+        els.textareas[side].addEventListener('paste', function (e) {
+          if (!e.clipboardData) return;
+          e.preventDefault();
+          var text = e.clipboardData.getData('text/plain');
+          insertPlainText(els.textareas[side], text || '');
+          updateSubmitState(side);
+        });
+
+        els.submits[side].addEventListener('click', function () {
+          submitText(side);
+        });
+
+        els.clears[side].addEventListener('click', function () {
+          state.files[side] = null;
+          loadSeq[side]++;
+          els.inputs[side].value = '';
+          els.textareas[side].value = '';
+          updateSubmitState(side);
+          scheduleDiff();
+        });
+
+        els.inputs[side].addEventListener('change', function () {
+          var files = this.files;
+          var file = files && files[0];
+          this.value = '';
+          if (file) loadFile(side, file);
+        });
+
+        bindDrop(els.panes[side], side);
+      })(sides[i]);
+    }
+
+    els.layoutSeg.addEventListener('click', function (e) {
+      var btn = closest(e.target, 'button');
+      var v = btn && btn.getAttribute('data-layout');
+      if (v) {
+        layoutTouched = true;
+        setLayout(v);
+      }
+    });
+
+    els.viewSeg.addEventListener('click', function (e) {
+      var btn = closest(e.target, 'button');
+      var v = btn && btn.getAttribute('data-view');
+      if (v) setView(v);
+    });
+
+    els.syncX.addEventListener('change', function () {
+      state.syncX = this.checked;
+      if (state.syncX) els.syncToggle.classList.add('on');
+      else els.syncToggle.classList.remove('on');
+    });
+
+    els.bodies.a.addEventListener('scroll', function () {
+      onPaneScroll(els.bodies.a, els.bodies.b);
+    }, { passive: true });
+
+    els.bodies.b.addEventListener('scroll', function () {
+      onPaneScroll(els.bodies.b, els.bodies.a);
+    }, { passive: true });
+
+    document.addEventListener('dragover', function (e) { e.preventDefault(); });
+    document.addEventListener('drop', function (e) { e.preventDefault(); });
+
+    window.addEventListener('resize', function () {
+      fitHeight();
+      if (!layoutTouched) {
+        var want = window.matchMedia && window.matchMedia('(max-width: 760px)').matches ? 'stack' : 'side';
+        if (want !== state.layout) setLayout(want);
+      }
+    });
+    window.addEventListener('orientationchange', function () {
+      setTimeout(function () {
+        fitHeight();
+        if (!layoutTouched) {
+          var want = window.matchMedia && window.matchMedia('(max-width: 760px)').matches ? 'stack' : 'side';
+          if (want !== state.layout) setLayout(want);
+        }
+      }, 150);
+    });
+  }
+
+  function init() {
+    var narrow = false;
+    try {
+      narrow = window.matchMedia('(max-width: 760px)').matches;
+    } catch (e) {}
+    setLayout(narrow ? 'stack' : 'side');
+    updateSeg(els.viewSeg, 'data-view', 'all');
+    bind();
+    fitHeight();
+    render();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

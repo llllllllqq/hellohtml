@@ -2,7 +2,7 @@
 
 本文件写给在本仓库工作的 AI 代理（也适用于人类贡献者），记录这个项目**怎么做、为什么这样做、哪里容易踩坑**。产品介绍、用法和功能细节在根 [README.md](README.md) 与各子项目的 README 里，这里不重复。
 
-当前基线：**v1.5.0**，8 个子项目、10 个 HTML 页面。数字会随项目变化，下面这些规则不变。
+当前基线：**v1.6.0**，10 个子项目、12 个 HTML 页面。数字会随项目变化，下面这些规则不变。
 
 动手前建议按顺序读：
 
@@ -50,6 +50,7 @@
 .
 ├── AGENTS.md                 # 本文件
 ├── README.md                 # 项目总览、版本规则、测试与发布说明
+├── CHANGELOG.md              # 每次发版的更新记录（按版本倒序）
 ├── package.json              # 只有 Playwright 与版本脚本，没有运行时依赖
 ├── playwright.config.js      # 3 个 project：桌面 Chrome / Pixel 5 / iPhone 13
 ├── scripts/
@@ -83,7 +84,7 @@
 ### 4.2 套页面规范
 
 - 补 `lang="zh-CN"`、`<meta charset>`、viewport、`color-scheme`。
-- 在页面可见标题里加**恰好一个**版本标记：`<span class="ver">v1.5.0</span>`。
+- 在页面可见标题里加**恰好一个**版本标记：`<span class="ver">v1.6.0</span>`。
 - `<title>` 只写功能名，不带版本号。
 - 详细清单见第 5 节。
 
@@ -107,9 +108,9 @@
 至少改这几处，漏一处就会留下不一致：
 
 - “项目结构”表格加一行 `[子项目](子项目/)`
-- 正文里的子项目数量（当前“八个子项目”）和页面数量（当前“十个页面”）
+- 正文里的子项目数量（当前“十个子项目”）和页面数量（当前“十二个页面”）
 - “测试覆盖”列表加上新子项目
-- 版本示例（`git tag v1.5.0`、`npm run version:set -- 1.5.0`）按当前版本更新
+- 版本示例（`git tag v1.6.0`、`npm run version:set -- 1.6.0`）按当前版本更新
 - 如果新增了测试文件，补一条覆盖说明
 
 ### 4.6 统一版本并验证
@@ -140,7 +141,7 @@ npm run version:check
 <style>/* 全部内联 */</style>
 </head>
 <body>
-  <h1>功能名 <span class="ver">v1.5.0</span></h1>
+  <h1>功能名 <span class="ver">v1.6.0</span></h1>
   <!-- 页面内容 -->
 <script>/* 全部内联 */</script>
 </body>
@@ -156,7 +157,7 @@ npm run version:check
 - 每页**有且只有一个** `class="ver"` 的元素，内容是 `vX.Y.Z`。
 - 位置在页面可见的标题区域（`h1` 里或页面标题容器里），不要只写在注释或 `<title>` 里。
 - 不要用 `id="ver"`、`data-version` 等其它写法，`scripts/versions.js` 只认 `class="ver">vX.Y.Z<`。
-- 测试里断言版本号用正则 `/^v\d+\.\d+\.\d+$/`，**不要写死 `v1.5.0`**，否则下次统一升版会误报。
+- 测试里断言版本号用正则 `/^v\d+\.\d+\.\d+$/`，**不要写死 `v1.6.0`**，否则下次统一升版会误报。
 
 ### 5.3 离线与 `file://`
 
@@ -223,15 +224,15 @@ npm run version:check
 ## 6. 版本号规则（最容易出错）
 
 - **唯一事实来源**是每个页面里的 `class="ver">vX.Y.Z<`，不是 `package.json` 的 `version`（它只是占位，不参与发版）。
-- 全仓库**所有页面**共用一个版本。只改了提醒器，十个页面也全部升到新版本，没改的子项目不能留在旧版本。
+- 全仓库**所有页面**共用一个版本。只改了提醒器，十二个页面也全部升到新版本，没改的子项目不能留在旧版本。
 - 发版标签 `vX.Y.Z` 必须和页面版本完全一致。
 - **只改文档、没动页面**时：版本号全部不动，也不打标签。
-- 统一升版只用脚本，不要手改十个文件：
+- 统一升版只用脚本，不要手改十二个文件：
 
 ```bash
 npm run version:set -- 1.6.0
 npm run version:check
-git diff --stat   # 首次升版应看到全部 10 个页面都变了；已是目标版本的页面不变属正常
+git diff --stat   # 首次升版应看到全部 12 个页面都变了；已是目标版本的页面不变属正常
 ```
 
 - 升版后同步更新根 README 里的版本示例（标签命令、`version:set` 示例、版本规则表格），以及本文件顶部的“当前基线”和示例版本。
@@ -347,6 +348,7 @@ test.describe('音频发生器', () => {
 - 测试覆盖列表
 - 发版示例里的版本号
 - 如果新增了目录或测试文件，补对应说明
+- 每次发版同步 `CHANGELOG.md` 顶部的版本记录
 
 ## 9. CI/CD 与发版
 
@@ -364,17 +366,21 @@ test.describe('音频发生器', () => {
 npm run version:set -- 1.6.0
 npm run version:check
 
-# 3. 提交并推 main
+# 3. 在 CHANGELOG.md 顶部补本次版本记录
+#    格式：## [x.y.z] - YYYY-MM-DD，写新增/变更/修复/测试
+
+# 4. 提交并推 main
 git status --short
 git add -A
 git commit -m "Add <功能>; bump to v1.6.0"
 git push origin main
 
-# 4. 等 main 的 CI 绿（见第 2 节命令），再打标签
+# 5. 等 main 的 CI 绿（见第 2 节命令），再打标签
 git tag v1.6.0
 git push origin v1.6.0
 ```
 
+- 从 v1.6.0 起，**每次发版都必须更新 CHANGELOG.md**：在顶部新增 `## [x.y.z] - YYYY-MM-DD`，列出新增、变更、修复和测试结果；只改代码不改日志视为未完成。
 - 提交信息用英文祈使句，带子项目/动作；涉及版本时在末尾写 `bump to vX.Y.Z`。参考现有提交：
 
   ```text
@@ -428,6 +434,8 @@ gh release edit v1.6.0 --repo llllllllqq/hellohtml --notes-file notes.md
 - **音视频剪切器（2 页）**：纯前端容器级无损剪切。测试不依赖 ffmpeg：夹具已提交，结构用独立解析器校验，内容用 WebAudio 解码后做相关性比对。大文件、长文件、损坏容器都要有错误分支。
 - **提醒器**：IndexedDB 优先、localStorage 降级；假时钟测试规则推算、到点弹层、稍后再说、补提醒、多标签页接管；睡眠/冻结用 `freeze`/`resume` + `visibilitychange` + 定时器间隔兜底。涉及 `window.confirm`、音频手势、标签页所有权，改动后务必跑回归。
 - **音频发生器**：全部由 Web Audio 实时合成，不加载音频文件；播放必须用户手势；切波形会重建音源，切噪声用 BufferSource；高频/超过 Nyquist 要有提示；示波器用 canvas，后台标签页会降频。
+- **文本编辑器**：编码识别和保存依赖 `TextDecoder` / `TextEncoder`；保存是 Blob 下载，不是写回原文件；未保存修改用 `confirm`；`?selftest` 会跑编码往返、BOM 和换行自检。测试覆盖 UTF-8 BOM、GBK + CRLF 的下载字节、查找替换和偏好持久化。
+- **文本对比器**：只按 UTF-8 读文件，不自动识别编码；行级 diff，末尾换行和 CRLF/LF 差异不参与比较；超大差异会退化为整段删除 + 新增；测试覆盖增删统计、仅差异视图、间隙折叠、布局和文件读取。
 
 ## 11. 踩坑清单
 
@@ -477,7 +485,8 @@ gh release edit v1.6.0 --repo llllllllqq/hellohtml --notes-file notes.md
 - [ ] 新功能/修复有对应用例，旧用例没有被无理由放宽
 - [ ] 子项目 README 更新（功能、限制、兼容、测试）
 - [ ] 根 README 的表格/数量/测试覆盖/版本示例同步
-- [ ] `npm run version:set -- X.Y.Z` 后 `npm run version:check` 通过，所有页面都变（当前 10 个；新增页面后以实际数量为准）
+- [ ] CHANGELOG.md 顶部已记录本次版本（新增/变更/修复/测试）
+- [ ] `npm run version:set -- X.Y.Z` 后 `npm run version:check` 通过，所有页面都变（当前 12 个；新增页面后以实际数量为准）
 - [ ] 推 main 后 CI 全绿（0 failed）
 - [ ] 需要发版时：标签 = 页面版本，Release 附件是 HTML-only zip，notes 为中文且版本正确
 - [ ] 对用户的汇报是中文，包含改动摘要、测试数字、Release/CI 链接

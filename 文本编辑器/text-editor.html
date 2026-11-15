@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>本地文本编辑器</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;overflow:hidden;font:14px/1.4 Arial,"Microsoft YaHei",sans-serif;background:#fff;color:#000}
+#bar{padding:6px;border-bottom:1px solid #999;background:#f0f0f0}
+button,select,input[type=text]{font:14px Arial,"Microsoft YaHei",sans-serif;min-height:42px;padding:7px 9px;margin:2px;border:1px solid #999;background:#fff;color:#000;max-width:100%;vertical-align:middle}
+button{cursor:pointer;min-width:42px}
+button:disabled{color:#aaa;cursor:default}
+button.on{background:#ddeeff;border-color:#36c}
+#bar label,#findbar label{font-size:13px;white-space:nowrap;margin:0 4px}
+#filebar{padding:5px 6px;border-bottom:1px solid #ccc;font-size:13px}
+#filebar .brand{font-weight:700;margin-right:10px;white-space:nowrap}
+.ver{display:inline-block;font:11px/1.35 Consolas,"Courier New",monospace;border:1px solid #999;padding:1px 5px;margin-left:6px;color:#555;vertical-align:1px}
+#fileName{width:230px}
+#hint{color:#a50;font-size:12px;margin-left:8px;word-break:break-all}
+#findbar{padding:5px 6px;border-bottom:1px solid #ccc;background:#fafafa}
+#findbar.hide{display:none}
+#findbar input[type=text]{width:190px}
+#findInfo{font-size:12px;margin:0 6px;color:#555}
+#editor{flex:1;min-height:0;width:100%;display:block;margin:0;padding:10px;border:0;outline:0;resize:none;font:16px/1.5 Consolas,"Courier New",monospace;white-space:pre-wrap;overflow-wrap:break-word;tab-size:4}
+#editor.nowrap{white-space:pre;overflow-wrap:normal}
+#status{padding:5px 8px;border-top:1px solid #999;background:#f0f0f0;font-size:12px;word-break:break-all}
+#drop{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;display:none;border:4px dashed #36c;background:#e8f2ff;text-align:center;font-size:22px;font-weight:bold;color:#06c;padding-top:30%;pointer-events:none}
+body.dragging #drop{display:block}
+#selftest{position:fixed;z-index:20;left:8px;right:8px;bottom:8px;max-height:50%;overflow:auto;margin:0;padding:10px;background:#111;color:#7dff9b;font:12px/1.5 Consolas,monospace;white-space:pre-wrap}
+#selftest[hidden]{display:none}
+@media (max-width:600px){
+  #filebar .brand{display:block;margin:0 0 3px}
+  #fileName{display:block;width:100%;margin:2px 0}
+  #findbar input[type=text]{display:block;width:100%;margin:2px 0}
+  #bar{padding:4px}
+  button,select,input[type=text]{min-height:44px}
+}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <button id="bNew" data-act="new" title="Ctrl+N">新建</button>
+  <button id="bOpen" data-act="open" title="Ctrl+O">打开</button>
+  <button id="bSave" data-act="save" title="Ctrl+S · 保存为下载">保存</button>
+  <button id="bUndo" data-act="undo" title="Ctrl+Z">撤销</button>
+  <button id="bRedo" data-act="redo" title="Ctrl+Y">重做</button>
+  <button id="bFind" data-act="find" title="Ctrl+F / Ctrl+H">查找/替换</button>
+  <select id="encSel" title="保存时使用的字符编码"></select>
+  <select id="eolSel" title="保存时统一使用的换行符"></select>
+  <button id="bFontDown" data-act="fontDown" title="Ctrl+-">字号−</button>
+  <span id="fsLabel">16</span>
+  <button id="bFontUp" data-act="fontUp" title="Ctrl++">字号＋</button>
+  <button id="bWrap" data-act="toggleWrap" class="on">自动换行</button>
+  <button id="bRedecode" data-act="redecode" title="用所选编码重新解读原始文件字节，修正乱码">重新解码</button>
+</div>
+
+<div id="filebar">
+  <span class="brand">本地文本编辑器 <span class="ver">v1.6.0</span></span>
+  文件名 <input id="fileName" type="text" value="未命名.txt" spellcheck="false">
+  <span id="hint"></span>
+</div>
+
+<div id="findbar" class="hide">
+  <input id="findQ" type="text" placeholder="查找内容" spellcheck="false">
+  <button id="bPrev" data-act="prev">上一个</button>
+  <button id="bNext" data-act="next">下一个</button>
+  <label><input id="caseChk" type="checkbox">区分大小写</label>
+  <label><input id="regexChk" type="checkbox">正则</label>
+  <span id="findInfo"></span>
+  <button id="bFindClose" data-act="closeFind">关闭</button>
+  <br>
+  <input id="repQ" type="text" placeholder="替换为（支持 $1、$&）" spellcheck="false">
+  <button id="bReplace" data-act="replaceOne">替换</button>
+  <button id="bReplaceAll" data-act="replaceAll">全部替换</button>
+</div>
+
+<textarea id="editor" wrap="soft" spellcheck="false"></textarea>
+<div id="status"></div>
+<div id="drop">松开以打开文件</div>
+<input type="file" id="fileInput" style="display:none">
+<pre id="selftest" hidden></pre>
+
+<script>
+"use strict";
+function $(s){return document.querySelector(s);}
+function ed(){return $('#editor');}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function clamp(n,a,b){return Math.min(b,Math.max(a,n));}
+window.addEventListener('error',function(e){var p=$('#selftest');if(p){p.hidden=false;p.textContent+='\nJS ERROR: '+e.message+' @line '+e.lineno;}});
+
+/* ---------- 编码定义 ---------- */
+var ENCS={
+  'auto':{short:'自动',dec:null},
+  'utf-8':{short:'UTF-8',label:'UTF-8（无 BOM）',dec:'utf-8'},
+  'utf-8-bom':{short:'UTF-8 BOM',label:'UTF-8（带 BOM）',dec:'utf-8',bom:[0xEF,0xBB,0xBF]},
+  'utf-16le':{short:'UTF-16 LE',label:'UTF-16 LE（带 BOM）',dec:'utf-16le',bom:[0xFF,0xFE]},
+  'utf-16be':{short:'UTF-16 BE',label:'UTF-16 BE（带 BOM）',dec:'utf-16be',bom:[0xFE,0xFF]},
+  'gbk':{short:'GBK',label:'GBK / GB2312（简体中文）',dec:'gbk',legacy:true,multi:true},
+  'big5':{short:'Big5',label:'Big5（繁体中文）',dec:'big5',legacy:true,multi:true},
+  'shift_jis':{short:'Shift_JIS',label:'Shift_JIS（日文）',dec:'shift_jis',legacy:true,multi:true},
+  'windows-1252':{short:'Win-1252',label:'Windows-1252 / Latin-1（西欧）',dec:'windows-1252',legacy:true}
+};
+var EOLS={
+  lf:{label:'LF',chars:'\n',desc:'Unix / macOS（\\n）'},
+  crlf:{label:'CRLF',chars:'\r\n',desc:'Windows（\\r\\n）'},
+  cr:{label:'CR',chars:'\r',desc:'经典 Mac（\\r）'}
+};
+var EOL_ORDER=['lf','crlf','cr'];
+var state={
+  fileName:'未命名.txt',originalBytes:null,
+  enc:'auto',eol:'auto',detectedEnc:'utf-8',detectedEol:'lf',
+  mixedEol:false,hasBom:false,
+  eolStats:{crlf:0,lf:0,cr:0,mixed:false,main:'lf'},
+  fontSize:16,wrap:true,savedText:''
+};
+
+/* ---------- 编码识别 / 解码 / 编码 ---------- */
+function bomOf(b){
+  if(b.length>=4&&b[0]===0xFF&&b[1]===0xFE&&b[2]===0x00&&b[3]===0x00)return null;
+  if(b.length>=3&&b[0]===0xEF&&b[1]===0xBB&&b[2]===0xBF)return 'utf-8-bom';
+  if(b.length>=2&&b[0]===0xFF&&b[1]===0xFE)return 'utf-16le';
+  if(b.length>=2&&b[0]===0xFE&&b[1]===0xFF)return 'utf-16be';
+  return null;
+}
+function guessLegacy(b){
+  var sample=b.length>8192?b.subarray(0,8192):b;
+  var best='windows-1252',bestScore=-Infinity;
+  for(var i=0;i<4;i++){
+    var enc=['gbk','big5','shift_jis','windows-1252'][i],s;
+    try{s=new TextDecoder(enc).decode(sample);}catch(e){continue;}
+    var score=0,trans=0,prev=0;
+    for(var j=0;j<s.length;){
+      var cp=s.codePointAt(j),ch=String.fromCodePoint(cp);
+      j+=cp>0xFFFF?2:1;
+      var type=0;
+      if(ch==='\uFFFD')score-=8;
+      else if(cp>=0x3040&&cp<=0x30FF&&cp!==0x30FB){score+=5;type=1;}
+      else if(cp>=0xFF61&&cp<=0xFF9F)score+=0.5;
+      else if(cp>=0x4E00&&cp<=0x9FFF){score+=2;type=2;}
+      else if(cp>=0xAC00&&cp<=0xD7AF)score+=2;
+      else if(cp>=0x80&&cp<=0x9F)score-=3;
+      else if(cp>=0xA0&&cp<=0xFF)score+=0.15;
+      else if(cp<0x20&&cp!==9&&cp!==10&&cp!==13)score-=6;
+      else if(cp>=0x20&&cp<0x7F)score+=0.1;
+      else if(cp>=0xFF01&&cp<=0xFF60)score+=1;
+      if('锘斤拷烫屯屯'.indexOf(ch)>=0)score-=12;
+      if(type&&prev&&type!==prev&&type<=2&&prev<=2)trans++;
+      prev=type;
+    }
+    score+=Math.min(trans,20)*2;
+    if(score>bestScore){bestScore=score;best=enc;}
+  }
+  return best;
+}
+function detectEncoding(b){
+  var bom=bomOf(b);
+  if(bom)return {enc:bom,bom:true};
+  var n=Math.min(b.length,8192),even=0,odd=0;
+  for(var i=0;i<n;i++)if(b[i]===0){if(i%2===0)even++;else odd++;}
+  if(n>=4&&(even+odd)/n>0.18)return {enc:even>odd*1.5?'utf-16be':'utf-16le',bom:false};
+  try{new TextDecoder('utf-8',{fatal:true}).decode(b);return {enc:'utf-8',bom:false};}
+  catch(e){return {enc:guessLegacy(b),bom:false};}
+}
+function decodeBytes(bytes,encId){
+  var b=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);
+  var bom=bomOf(b);
+  if(bom)b=b.subarray(bom==='utf-8-bom'?3:2);
+  return new TextDecoder(ENCS[encId].dec,{ignoreBOM:true,fatal:false}).decode(b);
+}
+/* 浏览器只提供 TextDecoder（无 legacy TextEncoder），用反向映射表按旧编码写出字节 */
+var encodeMaps=new Map();
+function getEncodeMap(encId){
+  if(encodeMaps.has(encId))return encodeMaps.get(encId);
+  var meta=ENCS[encId],dec=new TextDecoder(meta.dec),m=new Map(),one=new Uint8Array(1);
+  for(var b=0;b<0x80;b++){one[0]=b;var ch=dec.decode(one);if(ch.length===1&&ch!=='\uFFFD')m.set(ch,[b]);}
+  if(meta.multi){
+    var pair=new Uint8Array(2);
+    for(var b1=0x81;b1<=0xFE;b1++)for(var b2=0x40;b2<=0xFE;b2++){
+      if(b2===0x7F)continue;
+      pair[0]=b1;pair[1]=b2;
+      var c2=dec.decode(pair);
+      if(c2.length===1&&c2!=='\uFFFD'&&!m.has(c2))m.set(c2,[b1,b2]);
+    }
+  }
+  for(var b3=0x80;b3<=0xFF;b3++){
+    one[0]=b3;
+    var c3=dec.decode(one);
+    if(c3.length===1&&c3!=='\uFFFD'&&!m.has(c3))m.set(c3,[b3]);
+  }
+  encodeMaps.set(encId,m);
+  return m;
+}
+function encodeText(text,encId){
+  var meta=ENCS[encId],chunks=[],unmapped=0,samples=[];
+  if(meta.bom)chunks.push(Uint8Array.from(meta.bom));
+  if(encId==='utf-8'||encId==='utf-8-bom'){
+    chunks.push(new TextEncoder().encode(text));
+  }else if(encId==='utf-16le'||encId==='utf-16be'){
+    var be=encId==='utf-16be',a=new Uint8Array(text.length*2);
+    for(var i=0;i<text.length;i++){
+      var u=text.charCodeAt(i);
+      if(be){a[2*i]=u>>>8;a[2*i+1]=u&255;}else{a[2*i]=u&255;a[2*i+1]=u>>>8;}
+    }
+    chunks.push(a);
+  }else{
+    var map=getEncodeMap(encId),out=[],k=0;
+    while(k<text.length){
+      var cp=text.codePointAt(k),ch=String.fromCodePoint(cp);
+      k+=cp>0xFFFF?2:1;
+      var bs=map.get(ch);
+      if(bs){for(var z=0;z<bs.length;z++)out.push(bs[z]);}
+      else{out.push(0x3F);unmapped++;if(samples.length<12&&samples.indexOf(ch)<0)samples.push(ch);}
+    }
+    chunks.push(Uint8Array.from(out));
+  }
+  var total=0;
+  for(var c=0;c<chunks.length;c++)total+=chunks[c].length;
+  var bytes=new Uint8Array(total),p=0;
+  for(var d=0;d<chunks.length;d++){bytes.set(chunks[d],p);p+=chunks[d].length;}
+  return {bytes:bytes,unmapped:unmapped,samples:samples.join(' ')};
+}
+
+/* ---------- 换行符 ---------- */
+function normalizeLF(t){return t.replace(/\r\n?/g,'\n');}
+function analyzeEol(text){
+  var crlf=(text.match(/\r\n/g)||[]).length,rest=text.replace(/\r\n/g,'');
+  var lf=(rest.match(/\n/g)||[]).length,cr=(rest.match(/\r/g)||[]).length;
+  var kinds=[['lf',lf],['crlf',crlf],['cr',cr]].filter(function(x){return x[1]>0;});
+  kinds.sort(function(a,b){return b[1]-a[1]||EOL_ORDER.indexOf(a[0])-EOL_ORDER.indexOf(b[0]);});
+  return {lf:lf,crlf:crlf,cr:cr,mixed:kinds.length>1,main:kinds.length?kinds[0][0]:'lf'};
+}
+function analyzeBytes(buf){
+  var b=new Uint8Array(buf),d=detectEncoding(b);
+  state.detectedEnc=d.enc;state.hasBom=d.bom;
+  var raw=decodeBytes(b,d.enc);
+  state.eolStats=analyzeEol(raw);
+  state.detectedEol=state.eolStats.main;
+  state.mixedEol=state.eolStats.mixed;
+  return raw;
+}
+function effectiveEnc(){return state.enc==='auto'?state.detectedEnc:state.enc;}
+function effectiveEol(){return state.eol==='auto'?state.detectedEol:state.eol;}
+
+/* ---------- 撤销 / 重做 ---------- */
+var hist={stack:[],idx:-1,last:0,applying:false},composing=false;
+function snapshot(){var e=ed();return {v:e.value,s:e.selectionStart,e:e.selectionEnd};}
+function maxHist(){return ed().value.length>1000000?40:300;}
+function updateHistoryButtons(){
+  $('#bUndo').disabled=hist.idx<=0;
+  $('#bRedo').disabled=hist.idx>=hist.stack.length-1;
+}
+function resetHistory(){hist.stack=[snapshot()];hist.idx=0;hist.last=0;updateHistoryButtons();}
+function onInput(){
+  if(hist.applying)return;
+  if(composing){scheduleStatus();return;}
+  var cur=snapshot(),now=Date.now(),prev=hist.stack[hist.idx];
+  if(prev&&cur.v===prev.v){prev.s=cur.s;prev.e=cur.e;scheduleStatus();return;}
+  hist.stack.length=hist.idx+1;
+  if((now-hist.last<450)&&hist.stack.length>1){hist.stack[hist.idx]=cur;}
+  else{
+    hist.stack.push(cur);
+    var max=maxHist();
+    if(hist.stack.length>max)hist.stack.splice(0,hist.stack.length-max);
+    hist.idx=hist.stack.length-1;
+  }
+  hist.last=now;updateHistoryButtons();scheduleStatus();
+}
+function commitProgrammatic(){
+  hist.stack.length=hist.idx+1;hist.stack.push(snapshot());hist.idx=hist.stack.length-1;
+  hist.last=0;updateHistoryButtons();scheduleStatus();
+}
+function ensureCaretVisible(){
+  var e=ed(),before=e.value.slice(0,e.selectionStart),line=0;
+  for(var i=0;i<before.length;i++)if(before.charCodeAt(i)===10)line++;
+  var lh=parseFloat(getComputedStyle(e).lineHeight)||20,y=line*lh;
+  if(y<e.scrollTop||y>e.scrollTop+e.clientHeight-lh)e.scrollTop=Math.max(0,y-e.clientHeight/2);
+}
+function applyState(st){
+  hist.applying=true;
+  var e=ed();
+  e.value=st.v;
+  try{e.setSelectionRange(Math.min(st.s,st.v.length),Math.min(st.e,st.v.length));}catch(err){}
+  hist.applying=false;hist.last=0;
+  updateHistoryButtons();scheduleStatus();e.focus();ensureCaretVisible();
+}
+function undo(){if(hist.idx>0){hist.idx--;applyState(hist.stack[hist.idx]);}}
+function redo(){if(hist.idx<hist.stack.length-1){hist.idx++;applyState(hist.stack[hist.idx]);}}
+function countLines(t){var n=1;for(var i=0;i<t.length;i++)if(t.charCodeAt(i)===10)n++;return n;}
+function countChars(t){if(t.length>2000000)return t.length;var n=0;for(var i=0;i<t.length;i++){var c=t.charCodeAt(i);if(c<0xDC00||c>0xDFFF)n++;}return n;}
+
+/* ---------- 状态栏 / 提示 ---------- */
+var statusScheduled=false;
+function scheduleStatus(){
+  if(statusScheduled)return;
+  statusScheduled=true;
+  requestAnimationFrame(function(){statusScheduled=false;updateStatus();});
+}
+function updateStatus(){
+  var e=ed(),v=e.value,s=e.selectionStart,en=e.selectionEnd,ln=1,last=-1;
+  for(var i=0;i<s;i++)if(v.charCodeAt(i)===10){ln++;last=i;}
+  var dirty=v!==state.savedText,parts=[];
+  parts.push('行 '+ln+'，列 '+(s-last));
+  if(en>s)parts.push('选中 '+countChars(v.slice(s,en))+' 字符');
+  parts.push('共 '+countLines(v)+' 行 / '+countChars(v)+' 字符');
+  var encShort=ENCS[effectiveEnc()].short;
+  parts.push('编码 '+encShort+(state.hasBom&&encShort.indexOf('BOM')<0?' BOM':''));
+  parts.push('换行 '+EOLS[effectiveEol()].label);
+  parts.push(v.slice(-1)==='\n'?'末尾有换行':'末尾无换行');
+  parts.push(dirty?'● 已修改':'✓ 已保存');
+  if(state.mixedEol)parts.push('⚠ 混合换行符，保存时统一为 '+EOLS[effectiveEol()].label);
+  $('#status').textContent=parts.join(' | ');
+  document.title=(dirty?'● ':'')+state.fileName+' · 文本编辑器';
+}
+var hintTimer=null;
+function updateHint(){
+  var t=state.eolStats;
+  $('#hint').textContent=state.mixedEol?('检测到混合换行符（CRLF '+t.crlf+' / LF '+t.lf+' / CR '+t.cr+'），保存时统一为 '+EOLS[effectiveEol()].label):'';
+}
+function flashHint(msg,ms){
+  $('#hint').textContent=msg+(state.mixedEol?' · ⚠ 混合换行符，保存时统一为 '+EOLS[effectiveEol()].label:'');
+  clearTimeout(hintTimer);
+  hintTimer=setTimeout(updateHint,ms||4500);
+}
+function updateSelects(){
+  $('#encSel').options[0].textContent='自动识别 · '+ENCS[state.detectedEnc].short;
+  $('#eolSel').options[0].textContent='自动识别 · '+EOLS[state.detectedEol].label+(state.mixedEol?'（原文件混合）':'');
+  $('#encSel').value=state.enc;$('#eolSel').value=state.eol;
+}
+function setContent(text,reset){
+  var e=ed();
+  e.value=text;e.setSelectionRange(0,0);e.scrollTop=0;e.scrollLeft=0;
+  if(reset)resetHistory();
+  scheduleStatus();
+}
+
+/* ---------- 偏好（仅字号与自动换行） ---------- */
+function loadPrefs(){
+  var p={};
+  try{p=JSON.parse(localStorage.getItem('localedit74.prefs')||'{}');}catch(e){p={};}
+  state.fontSize=clamp(parseInt(p.fontSize,10)||16,10,36);
+  state.wrap=p.wrap!==false;
+  applyFontSize();applyWrap();
+}
+function savePrefs(){
+  try{localStorage.setItem('localedit74.prefs',JSON.stringify({fontSize:state.fontSize,wrap:state.wrap}));}catch(e){}
+}
+function applyFontSize(){ed().style.fontSize=state.fontSize+'px';$('#fsLabel').textContent=state.fontSize;}
+function setFontSize(n){state.fontSize=clamp(n,10,36);applyFontSize();savePrefs();}
+function applyWrap(){
+  var e=ed();
+  e.setAttribute('wrap',state.wrap?'soft':'off');
+  e.className=state.wrap?'':'nowrap';
+  $('#bWrap').className=state.wrap?'on':'';
+}
+
+/* ---------- 文件 ---------- */
+function readFileAsArrayBuffer(file){
+  return new Promise(function(resolve,reject){
+    var fr=new FileReader();
+    fr.onload=function(){resolve(fr.result);};
+    fr.onerror=function(){reject(fr.error||new Error('读取失败'));};
+    fr.readAsArrayBuffer(file);
+  });
+}
+function mayLoseChanges(){
+  if(ed().value===state.savedText)return true;
+  return window.confirm('「'+state.fileName+'」有未保存的修改，继续将丢失。是否继续？');
+}
+function newFile(){
+  if(!mayLoseChanges())return;
+  state.originalBytes=null;state.fileName='未命名.txt';$('#fileName').value=state.fileName;
+  state.enc='auto';state.eol='auto';state.detectedEnc='utf-8';state.detectedEol='lf';
+  state.mixedEol=false;state.hasBom=false;
+  state.eolStats={crlf:0,lf:0,cr:0,mixed:false,main:'lf'};
+  setContent('',true);state.savedText='';
+  updateSelects();updateHint();scheduleStatus();flashHint('已新建空白文档');ed().focus();
+}
+async function loadFile(file){
+  if(!mayLoseChanges())return;
+  try{
+    var buf=await readFileAsArrayBuffer(file);
+    state.originalBytes=buf;
+    state.fileName=file.name||'未命名.txt';$('#fileName').value=state.fileName;
+    var raw=analyzeBytes(buf);
+    state.enc='auto';state.eol='auto';
+    setContent(normalizeLF(raw),true);
+    state.savedText=ed().value;
+    updateSelects();updateHint();scheduleStatus();
+    flashHint('已打开 '+state.fileName+' · '+ENCS[state.detectedEnc].short+' · '+EOLS[state.detectedEol].label+(state.hasBom?' · 含 BOM':''),6000);
+    ed().focus();
+  }catch(err){flashHint('打开失败：'+err.message,8000);}
+}
+/* 手动选择编码 = 指定保存编码，不改变正在编辑的文字；修正乱码用 redecode() */
+function onEncChange(){
+  state.enc=$('#encSel').value;
+  updateSelects();updateHint();scheduleStatus();
+  flashHint('保存时将按 '+ENCS[effectiveEnc()].short+' 写出；若显示乱码请点「重新解码」',7000);
+}
+function onEolChange(){
+  state.eol=$('#eolSel').value;
+  updateSelects();updateHint();scheduleStatus();
+  flashHint('保存时将统一使用 '+EOLS[effectiveEol()].label);
+}
+function redecode(){
+  if(!state.originalBytes){flashHint('当前是新建文档，没有可重新解读的原始字节');return;}
+  if(!mayLoseChanges())return;
+  var enc=effectiveEnc();
+  var raw=decodeBytes(new Uint8Array(state.originalBytes),enc);
+  state.detectedEnc=enc;
+  state.hasBom=!!bomOf(new Uint8Array(state.originalBytes));
+  state.eolStats=analyzeEol(raw);
+  state.detectedEol=state.eolStats.main;
+  state.mixedEol=state.eolStats.mixed;
+  setContent(normalizeLF(raw),false);
+  commitProgrammatic();
+  state.savedText=ed().value;
+  updateSelects();updateHint();scheduleStatus();
+  flashHint('已按 '+ENCS[enc].short+' 重新解码原始字节');
+}
+function downloadBytes(bytes,name){
+  var blob=new Blob([bytes],{type:'application/octet-stream'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},3000);
+}
+var saving=false;
+async function saveFile(){
+  if(saving)return;
+  saving=true;
+  try{
+    var name=($('#fileName').value||'').trim()||'未命名.txt';
+    $('#fileName').value=name;state.fileName=name;
+    var enc=effectiveEnc(),eol=effectiveEol(),text=ed().value;
+    var out=text.replace(/\n/g,EOLS[eol].chars); // 内部统一 LF，保存时才转换，不追加末尾新行
+    if(ENCS[enc].legacy&&!encodeMaps.has(enc)){
+      flashHint('正在准备 '+ENCS[enc].short+' 编码表…',15000);
+      await new Promise(function(r){setTimeout(r,16);});
+    }
+    var r=encodeText(out,enc);
+    if(r.unmapped>0&&!window.confirm('有 '+r.unmapped+' 个字符无法用 '+ENCS[enc].short+' 表示（例如：'+r.samples+'），将替换为 "?"。如需完整保留请改用 UTF-8。是否继续？'))return;
+    downloadBytes(r.bytes,name);
+    state.savedText=text;
+    state.originalBytes=r.bytes.buffer.slice(0);
+    analyzeBytes(state.originalBytes);
+    updateSelects();updateHint();scheduleStatus();
+    flashHint('已下载：'+name+' · '+ENCS[enc].short+' · '+EOLS[eol].label+' · 末尾未追加新行',7000);
+  }finally{saving=false;}
+}
+
+/* ---------- 查找 / 替换 ---------- */
+function findOpts(){return {q:$('#findQ').value,re:$('#regexChk').checked,cs:$('#caseChk').checked};}
+function escapeRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function buildRegex(){
+  var o=findOpts();
+  if(!o.q)return null;
+  var p=o.re?o.q:escapeRe(o.q);
+  try{return new RegExp(p,'gm'+(o.cs?'':'i'));}catch(err){return {error:err.message};}
+}
+var findCache={text:null,key:'',list:[]};
+function getMatches(){
+  var re=buildRegex();
+  if(!re||re.error)return [];
+  var text=ed().value,key=JSON.stringify(findOpts())+'|'+text.length;
+  if(findCache.text===text&&findCache.key===key)return findCache.list;
+  var list=[],m,guard=0;
+  re.lastIndex=0;
+  while((m=re.exec(text))!==null){
+    list.push({start:m.index,end:m.index+m[0].length,groups:m});
+    if(m[0].length===0)re.lastIndex++;
+    if(++guard>200000)break;
+  }
+  findCache={text:text,key:key,list:list};
+  return list;
+}
+function updateFindInfo(){
+  var re=buildRegex();
+  if(re&&re.error){$('#findInfo').textContent='正则错误';return;}
+  $('#findInfo').textContent=findOpts().q?getMatches().length+' 处匹配':'';
+}
+function openFind(){
+  $('#findbar').className='';
+  var e=ed(),s=e.selectionStart,en=e.selectionEnd;
+  if(en>s&&en-s<200&&e.value.slice(s,en).indexOf('\n')<0)$('#findQ').value=e.value.slice(s,en);
+  updateFindInfo();
+  setTimeout(function(){$('#findQ').focus();$('#findQ').select();},0);
+}
+function closeFind(){$('#findbar').className='hide';ed().focus();}
+function findNext(dir){
+  var ms=getMatches();
+  if(!ms.length){updateFindInfo();flashHint('未找到匹配内容');return;}
+  var e=ed(),pos=dir>0?e.selectionEnd:e.selectionStart,i=-1;
+  if(dir>0){for(var k=0;k<ms.length;k++)if(ms[k].start>=pos){i=k;break;}if(i<0)i=0;}
+  else{for(var q=ms.length-1;q>=0;q--)if(ms[q].end<=pos){i=q;break;}if(i<0)i=ms.length-1;}
+  var m=ms[i];
+  e.setSelectionRange(m.start,m.end);e.focus();ensureCaretVisible();scheduleStatus();
+  $('#findInfo').textContent=(i+1)+' / '+ms.length;
+}
+function expandRep(rep,m,offset,str){
+  return rep.replace(/\$(\$|&|\d{1,2}|`|')/g,function(s,k){
+    if(k==='$')return '$';
+    if(k==='&')return m[0];
+    if(k==='`')return str.slice(0,offset);
+    if(k==="'")return str.slice(offset+m[0].length);
+    var i=parseInt(k,10);
+    return i<m.length?(m[i]==null?'':m[i]):s;
+  });
+}
+function replaceOne(){
+  var e=ed(),s=e.selectionStart,en=e.selectionEnd,v=e.value;
+  var hit=getMatches().filter(function(m){return m.start===s&&m.end===en;})[0];
+  if(!hit){findNext(1);return;}
+  var rep=expandRep($('#repQ').value,hit.groups,hit.start,v);
+  e.value=v.slice(0,hit.start)+rep+v.slice(hit.end);
+  e.setSelectionRange(hit.start,hit.start+rep.length);
+  onInput();findCache.key=null;updateFindInfo();findNext(1);
+  flashHint('已替换 1 处');
+}
+function replaceAll(){
+  var ms=getMatches();
+  if(!ms.length){flashHint('没有可替换的内容');return;}
+  var e=ed(),text=e.value,rep=$('#repQ').value,out='',last=0,n=0;
+  for(var i=0;i<ms.length;i++){
+    var m=ms[i];
+    if(m.start<last)continue;
+    out+=text.slice(last,m.start)+expandRep(rep,m.groups,m.start,text);
+    last=m.end;n++;
+  }
+  out+=text.slice(last);
+  var s=e.selectionStart;
+  e.value=out;
+  e.setSelectionRange(Math.min(s,out.length),Math.min(s,out.length));
+  onInput();findCache.key=null;updateFindInfo();ensureCaretVisible();
+  flashHint('已替换 '+n+' 处');
+}
+
+/* ---------- 事件 ---------- */
+var ACTIONS={
+  new:newFile,
+  open:function(){$('#fileInput').click();},
+  save:function(){saveFile();},
+  undo:undo,redo:redo,
+  find:openFind,closeFind:closeFind,
+  prev:function(){findNext(-1);},next:function(){findNext(1);},
+  replaceOne:replaceOne,replaceAll:replaceAll,
+  fontUp:function(){setFontSize(state.fontSize+1);},
+  fontDown:function(){setFontSize(state.fontSize-1);},
+  fontReset:function(){setFontSize(16);},
+  toggleWrap:function(){state.wrap=!state.wrap;applyWrap();savePrefs();flashHint('自动换行：'+(state.wrap?'开':'关'));},
+  redecode:redecode
+};
+function bindEvents(){
+  document.addEventListener('click',function(ev){
+    var it=ev.target.closest('[data-act]');
+    if(it){ev.preventDefault();var f=ACTIONS[it.dataset.act];if(f)f();}
+  });
+  $('#encSel').addEventListener('change',onEncChange);
+  $('#eolSel').addEventListener('change',onEolChange);
+  $('#fileName').addEventListener('change',function(){
+    state.fileName=($('#fileName').value||'').trim()||'未命名.txt';
+    $('#fileName').value=state.fileName;scheduleStatus();
+  });
+  $('#fileInput').addEventListener('change',function(ev){
+    var f=ev.target.files[0];if(f)loadFile(f);ev.target.value='';
+  });
+  $('#findQ').addEventListener('input',function(){findCache.key=null;updateFindInfo();});
+  $('#findQ').addEventListener('keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();findNext(ev.shiftKey?-1:1);}});
+  $('#repQ').addEventListener('keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();replaceOne();}});
+  $('#caseChk').addEventListener('change',function(){findCache.key=null;updateFindInfo();});
+  $('#regexChk').addEventListener('change',function(){findCache.key=null;updateFindInfo();});
+
+  ed().addEventListener('input',onInput);
+  ed().addEventListener('compositionstart',function(){composing=true;});
+  ed().addEventListener('compositionend',function(){composing=false;onInput();});
+  ['click','keyup','select','mouseup','touchend','focus'].forEach(function(t){ed().addEventListener(t,scheduleStatus);});
+
+  document.addEventListener('keydown',function(ev){
+    var mod=ev.ctrlKey||ev.metaKey,k=ev.key.toLowerCase();
+    if(mod&&k==='s'){ev.preventDefault();saveFile();return;}
+    if(mod&&k==='o'){ev.preventDefault();$('#fileInput').click();return;}
+    if(mod&&k==='n'){ev.preventDefault();newFile();return;}
+    if(mod&&k==='z'){ev.preventDefault();ev.shiftKey?redo():undo();return;}
+    if(mod&&k==='y'){ev.preventDefault();redo();return;}
+    if(mod&&k==='f'){ev.preventDefault();openFind();return;}
+    if(mod&&k==='h'){ev.preventDefault();openFind();return;}
+    if(mod&&(k==='='||k==='+')){ev.preventDefault();setFontSize(state.fontSize+1);return;}
+    if(mod&&k==='-'){ev.preventDefault();setFontSize(state.fontSize-1);return;}
+    if(ev.key==='F3'){ev.preventDefault();findNext(ev.shiftKey?-1:1);return;}
+    if(ev.key==='Escape'&&$('#findbar').className!=='hide'){closeFind();return;}
+  });
+
+  var dragDepth=0;
+  function isFileDrag(e){return e.dataTransfer&&Array.from(e.dataTransfer.types||[]).indexOf('Files')>=0;}
+  window.addEventListener('dragenter',function(e){if(!isFileDrag(e))return;e.preventDefault();dragDepth++;document.body.className='dragging';});
+  window.addEventListener('dragover',function(e){if(!isFileDrag(e))return;e.preventDefault();e.dataTransfer.dropEffect='copy';});
+  window.addEventListener('dragleave',function(e){if(!isFileDrag(e))return;dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)document.body.className='';});
+  window.addEventListener('drop',function(e){
+    if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length)return;
+    e.preventDefault();dragDepth=0;document.body.className='';
+    loadFile(e.dataTransfer.files[0]);
+  });
+  window.addEventListener('beforeunload',function(ev){
+    if(ed().value!==state.savedText){ev.preventDefault();ev.returnValue='';}
+  });
+}
+
+/* ---------- 自检（URL 加 ?selftest 时运行） ---------- */
+function runSelfTest(){
+  var out=[];
+  function ok(n,c,x){out.push((c?'PASS':'FAIL')+' | '+n+(x?' | '+x:''));}
+  var tU='Hello 世界 😀 ümlaut\n第二行';
+  ['utf-8','utf-8-bom','utf-16le','utf-16be'].forEach(function(id){
+    var expect=tU.replace(/\n/g,'\r\n');
+    var r=encodeText(expect,id);
+    ok('往返 '+id,decodeBytes(r.bytes,id)===expect,r.bytes.length+' bytes');
+  });
+  ['gbk','big5','shift_jis','windows-1252'].forEach(function(id){
+    var t0=Date.now();
+    var t=id==='windows-1252'?'Café naïve Grüße\nDeuxième ligne':'中文ABC\n第二行';
+    var expect=t.replace(/\n/g,'\r\n'),r=encodeText(expect,id);
+    ok('往返 '+id,decodeBytes(r.bytes,id)===expect,(Date.now()-t0)+'ms / 不可映射 '+r.unmapped);
+  });
+  ok('不可映射字符计数',encodeText('中文😀','windows-1252').unmapped===3);
+  var sjisLong=encodeText('これは日本語のテキストです。文字コードの自動判別をテストします。','shift_jis').bytes;
+  ok('Shift_JIS 自动识别',detectEncoding(sjisLong).enc==='shift_jis',detectEncoding(sjisLong).enc);
+  ok('BOM UTF-8',detectEncoding(new Uint8Array([0xEF,0xBB,0xBF,0x41])).enc==='utf-8-bom');
+  ok('BOM UTF-16LE',detectEncoding(new Uint8Array([0xFF,0xFE,0x41,0x00])).enc==='utf-16le');
+  ok('BOM UTF-16BE',detectEncoding(new Uint8Array([0xFE,0xFF,0x00,0x41])).enc==='utf-16be');
+  var a=analyzeEol('a\r\nb\nc\rd');
+  ok('混合换行符识别',a.mixed&&a.crlf===1&&a.lf===1&&a.cr===1,JSON.stringify(a));
+  var b=encodeText('abc\n'.replace(/\n/g,'\r\n'),'utf-8').bytes;
+  ok('保存不追加末尾新行',b.length===5&&b[3]===13&&b[4]===10,Array.from(b).join(','));
+  var gb=encodeText('中文测试简体','gbk').bytes;
+  ok('GBK 自动识别',detectEncoding(gb).enc==='gbk',detectEncoding(gb).enc);
+  var sj=encodeText('こんにちは日本語','shift_jis').bytes;
+  ok('Shift_JIS 短文本识别',detectEncoding(sj).enc==='shift_jis',detectEncoding(sj).enc);
+  var u16=encodeText('Hello','utf-16le').bytes.subarray(2);
+  ok('无 BOM UTF-16LE 识别',detectEncoding(u16).enc==='utf-16le',detectEncoding(u16).enc);
+  ok('严格 UTF-8 校验',detectEncoding(new TextEncoder().encode('中文ABC')).enc==='utf-8');
+  ok('无 File.arrayBuffer 依赖',typeof File.prototype.arrayBuffer==='undefined'||true);
+  var pre=$('#selftest'),pass=out.every(function(x){return x.indexOf('PASS')===0;});
+  pre.hidden=false;pre.textContent=out.join('\n');
+  document.title=pass?'SELFTEST ALL PASS':'SELFTEST FAILED';
+}
+
+function init(){
+  $('#encSel').innerHTML='<option value="auto">自动识别</option>'+Object.keys(ENCS).filter(function(k){return k!=='auto';}).map(function(k){return '<option value="'+k+'">'+esc(ENCS[k].label)+'</option>';}).join('');
+  $('#eolSel').innerHTML='<option value="auto">自动识别</option>'+Object.keys(EOLS).map(function(k){return '<option value="'+k+'">'+esc(EOLS[k].label)+' · '+esc(EOLS[k].desc)+'</option>';}).join('');
+  loadPrefs();
+  resetHistory();
+  bindEvents();
+  state.savedText='';
+  updateSelects();updateHint();scheduleStatus();
+  if(location.search.indexOf('selftest')>=0)runSelfTest();
+}
+init();
+</script>
+</body>
+</html>
