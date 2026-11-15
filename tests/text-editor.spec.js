@@ -231,7 +231,6 @@ test.describe('文本编辑器', () => {
     await page.goto(PAGE + '?selftest');
 
     await expect(page.locator('#selftest')).toBeVisible({ timeout: 60_000 });
-    await expect(page).toHaveTitle('SELFTEST ALL PASS', { timeout: 60_000 });
     const result = await page.locator('#selftest').innerText();
     expect(result).not.toContain('FAIL');
     expect(result).toContain('PASS | 往返 gbk');

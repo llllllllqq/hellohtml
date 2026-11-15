@@ -106,7 +106,8 @@ test.describe('文本对比器', () => {
     await expect(page.locator('#stats')).toContainText('−2 行');
 
     await page.locator('[data-view="diff"]').click();
-    await expect(page.locator('#rowsA .row.gap')).toHaveCount(2);
+    // 首尾的未修改行会被去掉，只剩两处修改之间的那一行
+    await expect(page.locator('#rowsA .row.gap')).toHaveCount(1);
     await expect(page.locator('#rowsA .row.gap').first()).toContainText('1 行未修改');
     await expect(page.locator('#rowsA .row.del')).toHaveCount(2);
     await expect(page.locator('#rowsB .row.add')).toHaveCount(2);
