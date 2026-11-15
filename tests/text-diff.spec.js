@@ -23,7 +23,7 @@ test.describe('文本对比器', () => {
     await expect(page).toHaveTitle('文本对比 · Diff');
     await expect(page.locator('.ver')).toHaveText(/^v\d+\.\d+\.\d+$/);
     await expect(page.locator('#workspace')).toHaveClass(isMobile ? /stack/ : /side/);
-    await expect(page.locator('#stats')).toContainText('在两侧输入文本并提交');
+    await expect(page.locator('#stats')).toHaveText('');
     await expect(page.locator('#submitA')).toBeDisabled();
     await expect(page.locator('#submitB')).toBeDisabled();
     await expect(page.locator('#nameA')).toHaveText('未选择文件');
@@ -44,12 +44,11 @@ test.describe('文本对比器', () => {
     await expect(page.locator('#nameA')).toHaveText('手动输入文本');
     await expect(page.locator('#metaA')).toContainText('3 行');
     await expect(page.locator('#submitA')).toBeDisabled();
-    await expect(page.locator('#stats')).toContainText('在另一侧输入文本并提交');
+    await expect(page.locator('#stats')).toHaveText('');
 
     await submit(page, 'B', '<b>a</b>\nB\nc');
-    await expect(page.locator('#stats')).toContainText('+1 行');
-    await expect(page.locator('#stats')).toContainText('−1 行');
-    await expect(page.locator('#stats')).toContainText('3 行 × 3 行');
+    await expect(page.locator('#stats')).toContainText('+1');
+    await expect(page.locator('#stats')).toContainText('−1');
 
     await expect(page.locator('#rowsA .row.eq')).toHaveCount(2);
     // 文本按纯文本渲染，<b> 不会被当成 HTML
@@ -60,7 +59,7 @@ test.describe('文本对比器', () => {
 
     await page.locator('#clearA').click();
     await expect(page.locator('#nameA')).toHaveText('未选择文件');
-    await expect(page.locator('#stats')).toContainText('在另一侧输入文本并提交');
+    await expect(page.locator('#stats')).toHaveText('');
     await expect(page.locator('#submitA')).toBeDisabled();
     await expect(page.locator('#clearA')).toBeHidden();
   });
@@ -71,9 +70,8 @@ test.describe('文本对比器', () => {
     await submit(page, 'A', 'a\nb');
     await submit(page, 'B', 'a\nb\nc');
 
-    await expect(page.locator('#stats')).toContainText('+1 行');
-    await expect(page.locator('#stats')).toContainText('−0 行');
-    await expect(page.locator('#stats')).toContainText('2 行 × 3 行');
+    await expect(page.locator('#stats')).toContainText('+1');
+    await expect(page.locator('#stats')).toContainText('−0');
     await expect(page.locator('#rowsB .row.add .code')).toHaveText('c');
     await expect(page.locator('#rowsA .row.filler')).toHaveCount(1);
   });
@@ -83,7 +81,7 @@ test.describe('文本对比器', () => {
 
     await submit(page, 'A', 'one\ntwo');
     await submit(page, 'B', 'one\ntwo');
-    await expect(page.locator('#stats')).toContainText('两个文件内容一致');
+    await expect(page.locator('#stats')).toContainText('内容一致');
     await expect(page.locator('#rowsA .row.eq')).toHaveCount(2);
 
     await page.locator('[data-view="diff"]').click();
@@ -102,8 +100,8 @@ test.describe('文本对比器', () => {
 
     await submit(page, 'A', 'a\nb\nc\nd\ne');
     await submit(page, 'B', 'a\nB\nc\nD\ne');
-    await expect(page.locator('#stats')).toContainText('+2 行');
-    await expect(page.locator('#stats')).toContainText('−2 行');
+    await expect(page.locator('#stats')).toContainText('+2');
+    await expect(page.locator('#stats')).toContainText('−2');
 
     await page.locator('[data-view="diff"]').click();
     // 首尾的未修改行会被去掉，只剩两处修改之间的那一行
@@ -111,6 +109,34 @@ test.describe('文本对比器', () => {
     await expect(page.locator('#rowsA .row.gap').first()).toContainText('1 行未修改');
     await expect(page.locator('#rowsA .row.del')).toHaveCount(2);
     await expect(page.locator('#rowsB .row.add')).toHaveCount(2);
+  });
+
+  test('顶栏在手机窄屏保持一行', async ({ page, isMobile }) => {
+    test.skip(!isMobile, '只在移动端 project 运行');
+
+    await page.goto(PAGE);
+
+    // 图标按钮在手机上只显示图标，文字标签隐藏
+    await expect(page.locator('.lbl').first()).toBeHidden();
+    await expect(page.locator('[data-layout="side"]')).toHaveAttribute('aria-label', '左右并排');
+
+    await submit(page, 'A', 'a\nb\nc');
+    await submit(page, 'B', 'a\nB\nc');
+    await expect(page.locator('#stats')).toContainText('+1');
+
+    const bar = await page.locator('.topbar').evaluate((el) => {
+      const brand = el.querySelector('.brand').getBoundingClientRect();
+      const stats = el.querySelector('#stats').getBoundingClientRect();
+      return {
+        height: el.getBoundingClientRect().height,
+        brandTop: brand.top,
+        statsTop: stats.top,
+      };
+    });
+
+    // 一行顶栏约为 38px；折成两行会超过 60px
+    expect(bar.height).toBeLessThan(44);
+    expect(Math.abs(bar.brandTop - bar.statsTop)).toBeLessThan(3);
   });
 
   test('布局切换与横向联动开关', async ({ page, isMobile }) => {
@@ -126,10 +152,12 @@ test.describe('文本对比器', () => {
     await expect(page.locator('#workspace')).toHaveClass(/side/);
     await expect(page.locator('[data-layout="side"]')).toHaveClass(/active/);
 
-    await page.locator('#syncX').check();
+    await page.locator('#syncToggle').click();
     await expect(page.locator('#syncToggle')).toHaveClass(/\bon\b/);
-    await page.locator('#syncX').uncheck();
+    await expect(page.locator('#syncToggle')).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('#syncToggle').click();
     await expect(page.locator('#syncToggle')).not.toHaveClass(/\bon\b/);
+    await expect(page.locator('#syncToggle')).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('打开两个文件后进行对比', async ({ page }) => {
@@ -151,8 +179,8 @@ test.describe('文本对比器', () => {
     await expect(page.locator('#metaA')).toContainText('2 行');
     await expect(page.locator('#clearA')).toBeVisible();
     await expect(page.locator('#clearB')).toBeVisible();
-    await expect(page.locator('#stats')).toContainText('+1 行');
-    await expect(page.locator('#stats')).toContainText('−1 行');
+    await expect(page.locator('#stats')).toContainText('+1');
+    await expect(page.locator('#stats')).toContainText('−1');
     await expect(page.locator('#rowsA .row.del .code')).toHaveText('old');
     await expect(page.locator('#rowsB .row.add .code')).toHaveText('new');
   });

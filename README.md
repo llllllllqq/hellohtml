@@ -47,8 +47,8 @@
 4. 创建 GitHub Release，附上自动生成的 release notes 和这个 zip
 
 ```bash
-git tag v1.6.0
-git push origin v1.6.0
+git tag v1.7.0
+git push origin v1.7.0
 ```
 
 ### 版本号规则
@@ -57,13 +57,13 @@ git push origin v1.6.0
 
 | 本次改动 | 页面上的版本 | 发布标签 |
 | --- | --- | --- |
-| 只修了「提醒器」 | 全部十二个页面统一 `v1.6.0`（其余子项目也一起升） | `v1.6.0` |
+| 只修了「提醒器」 | 全部十二个页面统一 `v1.7.0`（其余子项目也一起升） | `v1.7.0` |
 | 只改文档、没动页面 | 全部不变 | 不打标签（版本号对不上会被拦下） |
 
 不需要手改十二个文件，一条命令统一升版：
 
 ```bash
-npm run version:set -- 1.6.0   # 把所有页面的 class="ver" 统一改成 v1.6.0
+npm run version:set -- 1.7.0   # 把所有页面的 class="ver" 统一改成 v1.7.0
 npm run version:check          # 本地检查是否全部一致
 ```
 
