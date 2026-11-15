@@ -47,8 +47,8 @@
 4. 创建 GitHub Release，附上自动生成的 release notes 和这个 zip
 
 ```bash
-git tag v1.7.0
-git push origin v1.7.0
+git tag v1.8.0
+git push origin v1.8.0
 ```
 
 ### 版本号规则
@@ -57,13 +57,13 @@ git push origin v1.7.0
 
 | 本次改动 | 页面上的版本 | 发布标签 |
 | --- | --- | --- |
-| 只修了「提醒器」 | 全部十二个页面统一 `v1.7.0`（其余子项目也一起升） | `v1.7.0` |
+| 只修了「提醒器」 | 全部十二个页面统一 `v1.8.0`（其余子项目也一起升） | `v1.8.0` |
 | 只改文档、没动页面 | 全部不变 | 不打标签（版本号对不上会被拦下） |
 
 不需要手改十二个文件，一条命令统一升版：
 
 ```bash
-npm run version:set -- 1.7.0   # 把所有页面的 class="ver" 统一改成 v1.7.0
+npm run version:set -- 1.8.0   # 把所有页面的 class="ver" 统一改成 v1.8.0
 npm run version:check          # 本地检查是否全部一致
 ```
 
@@ -78,7 +78,7 @@ npm run version:check          # 本地检查是否全部一致
 - `提醒器` 用 Playwright 假时钟把时间推到触发点：验证每天/每周/每月/一次性的规则推算与文字描述、到点弹层、「稍后再说」5 分钟后再次提醒、关掉页面后重开的补提醒、导出 `config.txt` 再导入、暂停/删除与多标签页接管
 - `音视频剪切器` 覆盖 9 种音频“容器 × 编码”与 7 种 MP4 容器样本：用独立的容器解析器校验结构，用浏览器 WebAudio 解码后与源片段做相关性比对，并走一遍“上传 → 剪切 → 下载 → 可播放”的真实用户路径（测试夹具由 `tests/fixtures/cutter/generate.sh` 生成并随仓库提交，CI 不需要 ffmpeg）
 - `音频发生器` 覆盖频率输入 / 对数滑杆 / 预设 / 倍频、13 种波形与噪声切换、双声道与静音联动、快捷键；桌面端给 `AudioContext` 打桩，验证播放会真正创建振荡器或噪声缓冲源，停止后状态复位
-- `文本编辑器` 覆盖空白文档默认值、编辑与撤销/重做、`Ctrl+N` 新建确认、标题占位符随内容显隐、手机端顶栏压缩与短标签、UTF-8 BOM + CRLF 打开、UTF-8 / GBK + CRLF 下载字节、查找替换与正则错误、字号/换行偏好持久化、快捷键，以及 `?selftest` 的编码往返自检
+- `文本编辑器` 覆盖空白文档默认值、编辑与撤销/重做、`Ctrl+N` 新建确认、Tab 插入制表符、标题占位符随内容显隐、手机端顶栏压缩与短标签、UTF-8 BOM + CRLF 打开、UTF-8 / GBK + CRLF 下载字节、查找替换与正则错误、字号/换行偏好持久化、快捷键，以及 `?selftest` 的编码往返自检
 - `文本对比器` 覆盖两侧文本对比与增删统计、行对齐、纯文本转义、新增行占位、内容一致与仅差异视图、未修改行折叠、布局与横向联动、打开两个文件
 - 仓库结构自检：每个子项目都有 README 且提到自己的页面、根 README 列全所有子项目、每个页面正文恰好一个版本号且 `<title>` 不带版本号、**十二个页面版本号必须完全一致**，并直接跑一遍 `scripts/versions.js`
 - 运行记录、Playwright 报告和发布记录见 [Actions](https://github.com/llllllllqq/hellohtml/actions) 与 [Releases](https://github.com/llllllllqq/hellohtml/releases)

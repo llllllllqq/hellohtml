@@ -65,6 +65,23 @@ test.describe('文本编辑器', () => {
     await expect(page.locator('#placeholder')).toBeVisible();
   });
 
+  test('编辑区按 Tab 插入制表符，焦点留在编辑区', async ({ page }) => {
+    await page.goto(PAGE);
+
+    await page.locator('#editor').click();
+    await page.keyboard.type('a');
+    await page.keyboard.press('Tab');
+    await page.keyboard.type('b');
+    await expect(page.locator('#editor')).toHaveValue('a\tb');
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('editor');
+
+    // 有选区时，Tab 用制表符替换选中内容
+    await page.locator('#editor').evaluate((el) => el.setSelectionRange(0, 1));
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#editor')).toHaveValue('\tb');
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('editor');
+  });
+
   test('新建：Ctrl+N 触发未保存确认', async ({ page, isMobile }) => {
     test.skip(isMobile, '新建改为刷新页面或 Ctrl+N，只在桌面端测确认框');
 

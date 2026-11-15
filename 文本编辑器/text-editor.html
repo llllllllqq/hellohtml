@@ -91,7 +91,7 @@ body.dragging #drop{display:block}
 
 <div id="editorWrap">
   <textarea id="editor" wrap="soft" spellcheck="false" aria-label="文本编辑区"></textarea>
-  <div id="placeholder">本地文本编辑器 <span class="ver">v1.7.0</span></div>
+  <div id="placeholder">本地文本编辑器 <span class="ver">v1.8.0</span></div>
 </div>
 <div id="status"></div>
 <div id="drop">松开以打开文件</div>
@@ -303,6 +303,13 @@ function applyState(st){
 }
 function undo(){if(hist.idx>0){hist.idx--;applyState(hist.stack[hist.idx]);}}
 function redo(){if(hist.idx<hist.stack.length-1){hist.idx++;applyState(hist.stack[hist.idx]);}}
+/* 编辑区里的 Tab 插入制表符（浏览器默认是切换焦点）；Shift+Tab 仍然可以切出 */
+function insertTab(){
+  var e=ed(),v=e.value,s=e.selectionStart,en=e.selectionEnd;
+  e.value=v.slice(0,s)+'\t'+v.slice(en);
+  e.setSelectionRange(s+1,s+1);
+  onInput();
+}
 function countLines(t){var n=1;for(var i=0;i<t.length;i++)if(t.charCodeAt(i)===10)n++;return n;}
 function countChars(t){if(t.length>2000000)return t.length;var n=0;for(var i=0;i<t.length;i++){var c=t.charCodeAt(i);if(c<0xDC00||c>0xDFFF)n++;}return n;}
 
@@ -608,6 +615,11 @@ function bindEvents(){
   $('#regexChk').addEventListener('change',function(){findCache.key=null;updateFindInfo();});
 
   ed().addEventListener('input',onInput);
+  ed().addEventListener('keydown',function(ev){
+    if(ev.key!=='Tab'||ev.shiftKey||ev.ctrlKey||ev.metaKey||ev.altKey||composing||ev.isComposing)return;
+    ev.preventDefault();
+    insertTab();
+  });
   ed().addEventListener('compositionstart',function(){composing=true;});
   ed().addEventListener('compositionend',function(){composing=false;onInput();});
   ['click','keyup','select','mouseup','touchend','focus','blur'].forEach(function(t){ed().addEventListener(t,scheduleStatus);});
