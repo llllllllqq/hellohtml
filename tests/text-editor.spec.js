@@ -34,8 +34,8 @@ test.describe('文本编辑器', () => {
 
     await expect(page.locator('#status')).toContainText('行 1，列 1');
     await expect(page.locator('#status')).toContainText('共 1 行 / 0 字符');
-    await expect(page.locator('#status')).toContainText('编码 UTF-8');
-    await expect(page.locator('#status')).toContainText('换行 LF');
+    await expect(page.locator('#status')).toContainText('UTF-8');
+    await expect(page.locator('#status')).toContainText('LF');
     await expect(page.locator('#status')).toContainText('✓ 已保存');
 
     await expectResponsiveViewport(page);
@@ -116,9 +116,8 @@ test.describe('文本编辑器', () => {
 
     await expect(page.locator('#fileName')).toHaveValue('bom.txt');
     await expect(page.locator('#editor')).toHaveValue('第一行\n第二行');
-    await expect(page.locator('#status')).toContainText('编码 UTF-8 BOM');
-    await expect(page.locator('#status')).toContainText('换行 CRLF');
-    await expect(page.locator('#status')).toContainText('末尾无换行');
+    await expect(page.locator('#status')).toContainText('UTF-8 BOM');
+    await expect(page.locator('#status')).toContainText('CRLF');
     await expect(page.locator('#status')).toContainText('✓ 已保存');
     await expect(page.locator('#hint')).toContainText('已打开 bom.txt');
     await expect(page.locator('#hint')).toContainText('含 BOM');
@@ -171,8 +170,8 @@ test.describe('文本编辑器', () => {
       0xd6, 0xd0, 0xce, 0xc4, 0x0d, 0x0a, 0xd6, 0xd0, 0xce, 0xc4,
     ]);
 
-    await expect(page.locator('#status')).toContainText('编码 GBK');
-    await expect(page.locator('#status')).toContainText('换行 CRLF');
+    await expect(page.locator('#status')).toContainText('GBK');
+    await expect(page.locator('#status')).toContainText('CRLF');
     await expect(page.locator('#hint')).toContainText('GBK · CRLF');
   });
 
@@ -260,7 +259,7 @@ test.describe('文本编辑器', () => {
     await expect(page.locator('#fsLabel')).toHaveText('17');
     await expect(page.locator('#bWrap')).not.toHaveClass(/\bon\b/);
     await expect(page.locator('#editor')).toHaveClass(/nowrap/);
-    await expect(page.locator('#status')).toContainText('编码 UTF-8');
+    await expect(page.locator('#status')).toContainText('UTF-8');
   });
 
   test('快捷键 Ctrl+F 打开查找，Esc 关闭', async ({ page, isMobile }) => {

@@ -31,6 +31,8 @@ test.describe('文本对比器', () => {
     await expect(page.locator('#textA')).toBeVisible();
     await expect(page.locator('#textB')).toBeVisible();
     await expect(page.locator('#clearA')).toBeHidden();
+    await expect(page.locator('#encA')).toBeHidden();
+    await expect(page.locator('#encB')).toBeHidden();
 
     await expectResponsiveViewport(page);
     await expectNoHorizontalScroll(page);
@@ -62,6 +64,8 @@ test.describe('文本对比器', () => {
     await expect(page.locator('#stats')).toHaveText('');
     await expect(page.locator('#submitA')).toBeDisabled();
     await expect(page.locator('#clearA')).toBeHidden();
+    await expect(page.locator('#encA')).toBeHidden();
+    await expect(page.locator('#encB')).toBeHidden();
   });
 
   test('新增行：右侧显示 +1，左侧留空占位', async ({ page }) => {
@@ -158,6 +162,64 @@ test.describe('文本对比器', () => {
     await page.locator('#syncToggle').click();
     await expect(page.locator('#syncToggle')).not.toHaveClass(/\bon\b/);
     await expect(page.locator('#syncToggle')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('打开 GBK 文件：自动识别编码，手动切换后重新读取', async ({ page }) => {
+    await page.goto(PAGE);
+
+    // “中文”的 GBK 字节 + CRLF + “ABC”
+    const gbk = Buffer.from([0xd6, 0xd0, 0xce, 0xc4, 0x0d, 0x0a, 0x41, 0x42, 0x43]);
+    await page.locator('#fileA').setInputFiles({
+      name: 'gbk.txt',
+      mimeType: 'text/plain',
+      buffer: gbk,
+    });
+    await page.locator('#fileB').setInputFiles({
+      name: 'utf8.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('中文\nABC', 'utf8'),
+    });
+
+    await expect(page.locator('#encA')).toBeVisible();
+    await expect(page.locator('#encA')).toHaveValue('auto');
+    await expect(page.locator('#metaA')).toContainText('GBK');
+    await expect(page.locator('#rowsA .row.eq .code').first()).toHaveText('中文');
+    await expect(page.locator('#stats')).toContainText('内容一致');
+
+    // 手动指定 UTF-8：用原始字节重新解读，内容变成替换字符
+    await page.locator('#encA').selectOption('utf-8');
+    await expect(page.locator('#metaA')).toContainText('UTF-8');
+    await expect(page.locator('#stats')).not.toContainText('内容一致');
+    await expect(page.locator('#rowsA .row').first()).toContainText('\uFFFD');
+
+    // 切回自动：重新推断回 GBK
+    await page.locator('#encA').selectOption('auto');
+    await expect(page.locator('#metaA')).toContainText('GBK');
+    await expect(page.locator('#rowsA .row.eq .code').first()).toHaveText('中文');
+  });
+
+  test('混合换行符与 UTF-16 LE 文件都能正常分行', async ({ page }) => {
+    await page.goto(PAGE);
+
+    await page.locator('#fileA').setInputFiles({
+      name: 'mixed.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('a\r\nb\nc\rd', 'utf8'),
+    });
+    await expect(page.locator('#metaA')).toContainText('4 行');
+    await expect(page.locator('#rowsA .row.plain .code')).toHaveCount(4);
+    await expect(page.locator('#rowsA .row.plain .code').nth(1)).toHaveText('b');
+
+    await page.locator('#fileB').setInputFiles({
+      name: 'utf16le.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from([0xff, 0xfe, 0x61, 0x00, 0x0d, 0x00, 0x0a, 0x00, 0x62, 0x00]),
+    });
+    await expect(page.locator('#metaB')).toContainText('UTF-16 LE');
+    await expect(page.locator('#metaB')).toContainText('2 行');
+    await expect(page.locator('#nameB')).toHaveText('utf16le.txt');
+    await expect(page.locator('#rowsB .row.eq .code')).toHaveCount(2);
+    await expect(page.locator('#rowsB .row.eq .code').nth(1)).toHaveText('b');
   });
 
   test('打开两个文件后进行对比', async ({ page }) => {

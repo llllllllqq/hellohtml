@@ -91,7 +91,7 @@ body.dragging #drop{display:block}
 
 <div id="editorWrap">
   <textarea id="editor" wrap="soft" spellcheck="false" aria-label="文本编辑区"></textarea>
-  <div id="placeholder">本地文本编辑器 <span class="ver">v1.8.0</span></div>
+  <div id="placeholder">本地文本编辑器 <span class="ver">v1.9.0</span></div>
 </div>
 <div id="status"></div>
 <div id="drop">松开以打开文件</div>
@@ -336,9 +336,8 @@ function updateStatus(){
   if(en>s)parts.push('选中 '+countChars(v.slice(s,en))+' 字符');
   parts.push('共 '+countLines(v)+' 行 / '+countChars(v)+' 字符');
   var encShort=ENCS[effectiveEnc()].short;
-  parts.push('编码 '+encShort+(state.hasBom&&encShort.indexOf('BOM')<0?' BOM':''));
-  parts.push('换行 '+EOLS[effectiveEol()].label);
-  parts.push(v.slice(-1)==='\n'?'末尾有换行':'末尾无换行');
+  parts.push(encShort+(state.hasBom&&encShort.indexOf('BOM')<0?' BOM':''));
+  parts.push(EOLS[effectiveEol()].label);
   parts.push(dirty?'● 已修改':'✓ 已保存');
   if(state.mixedEol)parts.push('⚠ 混合换行符，保存时统一为 '+EOLS[effectiveEol()].label);
   $('#status').textContent=parts.join(' | ');

@@ -282,6 +282,25 @@
     line-height: 1;
     color: var(--muted);
   }
+  .enc-sel {
+    flex: 0 0 auto;
+    height: 28px;
+    max-width: 112px;
+    margin: 0 6px 0 0;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 11.5px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .enc-sel:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
 
   /* ---------- code area ---------- */
   .pane-body {
@@ -536,6 +555,7 @@
     .file-meta { font-size: 10.5px; }
     .btn { padding: 5px 8px; font-size: 11.5px; }
     .btn-icon { padding: 5px 7px; font-size: 13px; }
+    .enc-sel { height: 26px; max-width: 96px; margin-right: 4px; font-size: 11px; }
     .rows { font-size: 12px; }
     .row .ln { font-size: 10.5px; padding-right: 7px; }
     .row .code { padding-right: 12px; }
@@ -552,7 +572,7 @@
 <body>
 <div class="app" id="app">
   <header class="topbar">
-    <div class="brand">文本对比<span class="brand-sub">Diff</span> <span class="ver">v1.8.0</span></div>
+    <div class="brand">文本对比<span class="brand-sub">Diff</span> <span class="ver">v1.9.0</span></div>
     <div class="seg" id="layoutSeg" role="group" aria-label="布局切换">
       <button type="button" data-layout="side" class="active" title="左右并排" aria-label="左右并排"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="1.6" y="2.2" width="5.2" height="11.6" rx="1.1"></rect><rect x="9.2" y="2.2" width="5.2" height="11.6" rx="1.1"></rect></svg><span class="lbl">左右</span></button>
       <button type="button" data-layout="stack" title="上下堆叠" aria-label="上下堆叠"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="2.2" y="1.6" width="11.6" height="5.2" rx="1.1"></rect><rect x="2.2" y="9.2" width="11.6" height="5.2" rx="1.1"></rect></svg><span class="lbl">上下</span></button>
@@ -574,6 +594,7 @@
           <div class="file-meta" id="metaA">左侧文档</div>
         </div>
         <div class="head-actions">
+          <select class="enc-sel hidden" id="encA" aria-label="左侧文件编码" title="字符编码：自动推断，也可以手动指定"></select>
           <button type="button" class="btn" id="openA">打开文件</button>
           <button type="button" class="btn btn-icon hidden" id="clearA" title="清除左侧文件" aria-label="清除左侧文件">×</button>
         </div>
@@ -604,6 +625,7 @@
           <div class="file-meta" id="metaB">右侧文档</div>
         </div>
         <div class="head-actions">
+          <select class="enc-sel hidden" id="encB" aria-label="右侧文件编码" title="字符编码：自动推断，也可以手动指定"></select>
           <button type="button" class="btn" id="openB">打开文件</button>
           <button type="button" class="btn btn-icon hidden" id="clearB" title="清除右侧文件" aria-label="清除右侧文件">×</button>
         </div>
@@ -894,6 +916,87 @@
     return (bytes / 1024 / 1024).toFixed(2) + ' MB';
   }
 
+  /* ---------- 字符编码 ---------- */
+  var ENCS = {
+    'utf-8': { short: 'UTF-8', dec: 'utf-8' },
+    'utf-8-bom': { short: 'UTF-8 BOM', dec: 'utf-8', bom: [0xEF, 0xBB, 0xBF] },
+    'utf-16le': { short: 'UTF-16 LE', dec: 'utf-16le', bom: [0xFF, 0xFE] },
+    'utf-16be': { short: 'UTF-16 BE', dec: 'utf-16be', bom: [0xFE, 0xFF] },
+    gbk: { short: 'GBK', dec: 'gbk', legacy: true, multi: true },
+    big5: { short: 'Big5', dec: 'big5', legacy: true, multi: true },
+    shift_jis: { short: 'Shift_JIS', dec: 'shift_jis', legacy: true, multi: true },
+    'windows-1252': { short: 'Win-1252', dec: 'windows-1252', legacy: true }
+  };
+  var ENC_ORDER = ['utf-8', 'utf-8-bom', 'utf-16le', 'utf-16be', 'gbk', 'big5', 'shift_jis', 'windows-1252'];
+
+  function bomOf(b) {
+    if (b.length >= 4 && b[0] === 0xFF && b[1] === 0xFE && b[2] === 0x00 && b[3] === 0x00) return null;
+    if (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return 'utf-8-bom';
+    if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) return 'utf-16le';
+    if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) return 'utf-16be';
+    return null;
+  }
+
+  /* 无 BOM 时在 GBK / Big5 / Shift_JIS / Win-1252 里按字符分布打分挑一个 */
+  function guessLegacy(b) {
+    var sample = b.length > 8192 ? b.subarray(0, 8192) : b;
+    var best = 'windows-1252';
+    var bestScore = -Infinity;
+    for (var i = 0; i < 4; i++) {
+      var enc = ['gbk', 'big5', 'shift_jis', 'windows-1252'][i];
+      var s;
+      try { s = new TextDecoder(enc).decode(sample); } catch (e) { continue; }
+      var score = 0;
+      var trans = 0;
+      var prev = 0;
+      for (var j = 0; j < s.length;) {
+        var cp = s.codePointAt(j);
+        var ch = String.fromCodePoint(cp);
+        j += cp > 0xFFFF ? 2 : 1;
+        var type = 0;
+        if (ch === '\uFFFD') score -= 8;
+        else if (cp >= 0x3040 && cp <= 0x30FF && cp !== 0x30FB) { score += 5; type = 1; }
+        else if (cp >= 0xFF61 && cp <= 0xFF9F) score += 0.5;
+        else if (cp >= 0x4E00 && cp <= 0x9FFF) { score += 2; type = 2; }
+        else if (cp >= 0xAC00 && cp <= 0xD7AF) score += 2;
+        else if (cp >= 0x80 && cp <= 0x9F) score -= 3;
+        else if (cp >= 0xA0 && cp <= 0xFF) score += 0.15;
+        else if (cp < 0x20 && cp !== 9 && cp !== 10 && cp !== 13) score -= 6;
+        else if (cp >= 0x20 && cp < 0x7F) score += 0.1;
+        else if (cp >= 0xFF01 && cp <= 0xFF60) score += 1;
+        if ('锘斤拷烫屯屯'.indexOf(ch) >= 0) score -= 12;
+        if (type && prev && type !== prev && type <= 2 && prev <= 2) trans++;
+        prev = type;
+      }
+      score += Math.min(trans, 20) * 2;
+      if (score > bestScore) { bestScore = score; best = enc; }
+    }
+    return best;
+  }
+
+  function detectEncoding(b) {
+    var bom = bomOf(b);
+    if (bom) return { enc: bom, bom: true };
+    var n = Math.min(b.length, 8192);
+    var even = 0;
+    var odd = 0;
+    for (var i = 0; i < n; i++) if (b[i] === 0) { if (i % 2 === 0) even++; else odd++; }
+    if (n >= 4 && (even + odd) / n > 0.18) return { enc: even > odd * 1.5 ? 'utf-16be' : 'utf-16le', bom: false };
+    try { new TextDecoder('utf-8', { fatal: true }).decode(b); return { enc: 'utf-8', bom: false }; }
+    catch (e) { return { enc: guessLegacy(b), bom: false }; }
+  }
+
+  function decodeBytes(bytes, encId) {
+    var b = bytes;
+    var bom = bomOf(b);
+    if (bom) b = b.subarray(bom === 'utf-8-bom' ? 3 : 2);
+    try {
+      return new TextDecoder(ENCS[encId].dec, { ignoreBOM: true, fatal: false }).decode(b);
+    } catch (e) {
+      return new TextDecoder('utf-8').decode(b);
+    }
+  }
+
   var $ = function (id) { return document.getElementById(id); };
 
   var els = {
@@ -914,6 +1017,7 @@
     metas: { a: $('metaA'), b: $('metaB') },
     opens: { a: $('openA'), b: $('openB') },
     clears: { a: $('clearA'), b: $('clearB') },
+    encs: { a: $('encA'), b: $('encB') },
     inputs: { a: $('fileA'), b: $('fileB') }
   };
 
@@ -1088,6 +1192,7 @@
     var metaEl = els.metas[side];
     var openBtn = els.opens[side];
     var clearBtn = els.clears[side];
+    var encSel = els.encs[side];
 
     if (!file) {
       rowsEl.innerHTML = '';
@@ -1095,6 +1200,7 @@
       metaEl.textContent = '可直接输入纯文本';
       openBtn.textContent = '打开文件';
       clearBtn.classList.add('hidden');
+      encSel.classList.add('hidden');
       els.empties[side].classList.add('hidden');
       els.editors[side].classList.remove('hidden');
       updateSubmitState(side);
@@ -1104,9 +1210,15 @@
     els.editors[side].classList.add('hidden');
     nameEl.textContent = file.name;
     metaEl.textContent = fmtNum(file.lines.length) + ' 行 · ' +
-      (file.manual ? '纯文本' : formatBytes(file.size));
+      (file.manual ? '纯文本' : formatBytes(file.size) + (file.enc ? ' · ' + ENCS[file.enc].short : ''));
     openBtn.textContent = '更换文件';
     clearBtn.classList.remove('hidden');
+    if (file.bytes) {
+      encSel.classList.remove('hidden');
+      encSel.value = file.auto ? 'auto' : file.enc;
+    } else {
+      encSel.classList.add('hidden');
+    }
 
     if (!state.rows && file.lines.length === 0) {
       rowsEl.innerHTML = '';
@@ -1205,12 +1317,15 @@
 
     reader.onload = function () {
       if (seq !== loadSeq[side]) return;
-      var text = typeof reader.result === 'string' ? reader.result : '';
-      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      var bytes = new Uint8Array(reader.result || new ArrayBuffer(0));
+      var det = detectEncoding(bytes);
       state.files[side] = {
         name: file.name || '未命名文件',
         size: file.size || 0,
-        lines: splitLines(text)
+        lines: splitLines(decodeBytes(bytes, det.enc)),
+        bytes: bytes,
+        enc: det.enc,
+        auto: true
       };
       els.textareas[side].value = '';
       updateSubmitState(side);
@@ -1224,7 +1339,17 @@
       render();
     };
 
-    reader.readAsText(file, 'UTF-8');
+    reader.readAsArrayBuffer(file);
+  }
+
+  /* 手动改编码：用原始字节按新编码重新解读，并重新对比 */
+  function setEncoding(side, value) {
+    var file = state.files[side];
+    if (!file || !file.bytes) return;
+    file.auto = value === 'auto';
+    file.enc = file.auto ? detectEncoding(file.bytes).enc : value;
+    file.lines = splitLines(decodeBytes(file.bytes, file.enc));
+    scheduleDiff();
   }
 
   /* Vertical-only scroll sync, coalesced to one write per frame.
@@ -1389,6 +1514,10 @@
           scheduleDiff();
         });
 
+        els.encs[side].addEventListener('change', function () {
+          setEncoding(side, this.value);
+        });
+
         els.inputs[side].addEventListener('change', function () {
           var files = this.files;
           var file = files && files[0];
@@ -1451,7 +1580,17 @@
     });
   }
 
+  function fillEncSelect(sel) {
+    var html = '<option value="auto">自动</option>';
+    for (var i = 0; i < ENC_ORDER.length; i++) {
+      html += '<option value="' + ENC_ORDER[i] + '">' + ENCS[ENC_ORDER[i]].short + '</option>';
+    }
+    sel.innerHTML = html;
+  }
+
   function init() {
+    fillEncSelect(els.encs.a);
+    fillEncSelect(els.encs.b);
     var narrow = false;
     try {
       narrow = window.matchMedia('(max-width: 760px)').matches;
