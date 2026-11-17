@@ -204,7 +204,9 @@ test.describe('文本对比器', () => {
     // 尖括号被转义，没有真的插入 <b> 元素
     await expect(page.locator('#rowsA .row.del .code b')).toHaveCount(0);
 
-    // emoji 是一个字符，不能被拆成半个代理对
+    // emoji 是一个字符，不能被拆成半个代理对；重新打开页面换一组文本
+    await page.goto(PAGE);
+    await page.locator('#inlineToggle').click();
     await submit(page, 'A', '中文😀结束');
     await submit(page, 'B', '中文😃结束');
     await expect(page.locator('#rowsA .row.del .chg')).toHaveText('😀');
@@ -239,6 +241,8 @@ test.describe('文本对比器', () => {
     await expect(page.locator('#rowsB .row.add .chg')).toHaveText('B');
 
     // 整行几乎全改：跳过字符级比较，保留整行高亮，页面不卡死也不报错
+    await page.goto(PAGE);
+    await page.locator('#inlineToggle').click();
     const bigA = 'p'.repeat(2500);
     const bigB = 'q'.repeat(2500);
     await submit(page, 'A', bigA);
