@@ -123,6 +123,7 @@ test.describe('文本对比器', () => {
     // 图标按钮在手机上只显示图标，文字标签隐藏
     await expect(page.locator('.lbl').first()).toBeHidden();
     await expect(page.locator('[data-layout="side"]')).toHaveAttribute('aria-label', '左右并排');
+    await expect(page.locator('#inlineToggle')).toBeVisible();
 
     await submit(page, 'A', 'a\nb\nc');
     await submit(page, 'B', 'a\nB\nc');
@@ -162,6 +163,89 @@ test.describe('文本对比器', () => {
     await page.locator('#syncToggle').click();
     await expect(page.locator('#syncToggle')).not.toHaveClass(/\bon\b/);
     await expect(page.locator('#syncToggle')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('行内对比：默认关闭，打开后只高亮变化的字符', async ({ page }) => {
+    await page.goto(PAGE);
+
+    await expect(page.locator('#inlineToggle')).toHaveAttribute('aria-pressed', 'false');
+    await submit(page, 'A', 'const value = 1;');
+    await submit(page, 'B', 'const value = 2;');
+    // 默认只有整行底色，没有行内标记
+    await expect(page.locator('#rowsA .chg')).toHaveCount(0);
+
+    await page.locator('#inlineToggle').click();
+    await expect(page.locator('#inlineToggle')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#inlineToggle')).toHaveClass(/\bon\b/);
+    await expect(page.locator('#rowsA .row.del .chg')).toHaveText('1');
+    await expect(page.locator('#rowsB .row.add .chg')).toHaveText('2');
+    // 未变化的字符一个不少
+    await expect(page.locator('#rowsA .row.del .code')).toHaveText('const value = 1;');
+    await expect(page.locator('#rowsB .row.add .code')).toHaveText('const value = 2;');
+
+    await page.locator('#inlineToggle').click();
+    await expect(page.locator('#inlineToggle')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('#rowsA .chg')).toHaveCount(0);
+    await expect(page.locator('#rowsA .row.del .code')).toHaveText('const value = 1;');
+  });
+
+  test('行内对比：中文、emoji 与 HTML 特殊字符按纯文本高亮', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+
+    await page.goto(PAGE);
+
+    await submit(page, 'A', 'a<b>c');
+    await submit(page, 'B', 'a<i>c');
+    await page.locator('#inlineToggle').click();
+    await expect(page.locator('#rowsA .row.del .code')).toHaveText('a<b>c');
+    await expect(page.locator('#rowsA .row.del .chg')).toHaveText('b');
+    await expect(page.locator('#rowsB .row.add .chg')).toHaveText('i');
+    // 尖括号被转义，没有真的插入 <b> 元素
+    await expect(page.locator('#rowsA .row.del .code b')).toHaveCount(0);
+
+    // emoji 是一个字符，不能被拆成半个代理对
+    await submit(page, 'A', '中文😀结束');
+    await submit(page, 'B', '中文😃结束');
+    await expect(page.locator('#rowsA .row.del .chg')).toHaveText('😀');
+    await expect(page.locator('#rowsB .row.add .chg')).toHaveText('😃');
+    await expect(page.locator('#rowsA .row.del .code')).toHaveText('中文😀结束');
+
+    expect(errors).toEqual([]);
+  });
+
+  test('行内对比：「仅差异」视图里同样生效', async ({ page }) => {
+    await page.goto(PAGE);
+
+    await submit(page, 'A', 'a\nb\nc\nd');
+    await submit(page, 'B', 'a\nB\nc\nD');
+    await page.locator('[data-view="diff"]').click();
+    await page.locator('#inlineToggle').click();
+
+    await expect(page.locator('#rowsA .row.gap')).toHaveCount(1);
+    await expect(page.locator('#rowsA .row.del .chg')).toHaveCount(2);
+    await expect(page.locator('#rowsA .row.del .chg').first()).toHaveText('b');
+    await expect(page.locator('#rowsB .row.add .chg').first()).toHaveText('B');
+  });
+
+  test('行内对比：长行只改末尾几字仍有行内高亮，整行重写则退回整行高亮', async ({ page }) => {
+    await page.goto(PAGE);
+
+    // 前后缀裁剪后只比较末尾一个字符
+    await submit(page, 'A', 'x'.repeat(2000) + 'A');
+    await submit(page, 'B', 'x'.repeat(2000) + 'B');
+    await page.locator('#inlineToggle').click();
+    await expect(page.locator('#rowsA .row.del .chg')).toHaveText('A');
+    await expect(page.locator('#rowsB .row.add .chg')).toHaveText('B');
+
+    // 整行几乎全改：跳过字符级比较，保留整行高亮，页面不卡死也不报错
+    const bigA = 'p'.repeat(2500);
+    const bigB = 'q'.repeat(2500);
+    await submit(page, 'A', bigA);
+    await submit(page, 'B', bigB);
+    await expect(page.locator('#rowsA .row.del .chg')).toHaveCount(0);
+    await expect(page.locator('#rowsA .row.del .code')).toHaveText(bigA);
+    await expect(page.locator('#rowsB .row.add .code')).toHaveText(bigB);
   });
 
   test('打开 GBK 文件：自动识别编码，手动切换后重新读取', async ({ page }) => {
