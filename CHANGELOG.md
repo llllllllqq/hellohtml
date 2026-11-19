@@ -20,7 +20,7 @@
 ### 测试
 
 - 新增提醒器用例：同一时刻到点两条逐条弹出、弹层开着时新到点的提醒入队、稍后再说只影响当前这条、打开页面补提醒时多条错过的提醒也逐条弹
-- CI：**X passed / Y skipped / 0 failed**，桌面 Chrome、Pixel 5、iPhone 13 全绿
+- CI：**312 passed / 192 skipped / 0 failed**，桌面 Chrome、Pixel 5、iPhone 13 全绿
 
 ## [1.10.0] - 2026-11-17
 
