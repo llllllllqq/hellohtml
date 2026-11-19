@@ -291,6 +291,78 @@ test.describe('提醒器', () => {
     await expect(page.locator('#nextLine')).toContainText('明天 09:00');
   });
 
+  test('同一时刻到点两条提醒：逐条弹出，不会一起被清掉', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+
+    await addJob(page, { label: '吃降压药' });
+    await addJob(page, { label: '喝水' });
+
+    await page.clock.runFor(45_000);
+
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
+    await expect(page.locator('#alarmList')).toContainText('还有 1 条提醒等你确认');
+
+    await page.locator('#btnAck').click();
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+    // 隔 800ms 再弹下一条，避免连点把下一条一起点掉
+    await page.clock.runFor(1_000);
+
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
+    await expect(page.locator('#alarmList')).toHaveText('');
+
+    await page.locator('#btnAck').click();
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+    await expect(page.locator('#nextLine')).toContainText('明天');
+  });
+
+  test('弹层没关时新到点的提醒会排队，不会被丢掉', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+
+    await addJob(page, { label: '吃降压药' });
+    await addJob(page, { label: '喝水', time: '09:01' });
+
+    await page.clock.runFor(45_000);
+    await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
+
+    // 弹层一直开着，等到第二条到点
+    await page.clock.runFor(65_000);
+    await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
+    await expect(page.locator('#alarmList')).toContainText('还有 1 条提醒等你确认');
+
+    await page.locator('#btnAck').click();
+    await page.clock.runFor(1_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
+  });
+
+  test('稍后再说只作用于当前这条，队列里的下一条照常弹出', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+
+    await addJob(page, { label: '吃降压药' });
+    await addJob(page, { label: '喝水' });
+
+    await page.clock.runFor(45_000);
+    await page.locator('#btnSnooze').click();
+
+    await expect(page.locator('#toast')).toContainText('还有 1 条待确认');
+    await expect(page.locator('.snooze-tag')).toHaveText('稍后 09:05');
+
+    await page.clock.runFor(1_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
+  });
+
   test('稍后再说：5 分钟后再次提醒', async ({ page, isMobile }) => {
     test.skip(isMobile, '只在桌面端跑');
     await installClock(page, '2026-03-10T08:59:30+08:00');
@@ -362,6 +434,31 @@ test.describe('提醒器', () => {
 
     await page.locator('#btnAck').click();
     await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+  });
+
+  test('补提醒时多条错过的提醒也逐条弹出', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:00:00+08:00');
+    await openPage(page);
+
+    await importJobs(page, [
+      { id: 'd1', label: '吃降压药', rule: { type: 'daily', h: 9, m: 0 }, enabled: true },
+      { id: 'd2', label: '喝水', rule: { type: 'daily', h: 9, m: 0 }, enabled: true },
+    ]);
+
+    // 模拟「关掉页面，5 分钟后再打开」
+    await page.clock.setSystemTime(new Date('2026-03-10T09:05:00+08:00'));
+    await page.reload();
+    await expect(page.locator('#statusText')).not.toHaveText('正在检查声音状态…');
+    await page.clock.runFor(1_000);
+
+    await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
+    await expect(page.locator('#alarmList')).toContainText('还有 1 条提醒等你确认');
+
+    await page.locator('#btnAck').click();
+    await page.clock.runFor(1_000);
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
   });
 
   test('页面被冻结后恢复，会补弹挂起期间到点的提醒', async ({ page, isMobile }) => {

@@ -193,7 +193,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
   <div class="app">
 
     <div class="hd">
-      <div class="hd-title">提醒器 <span class="ver">v1.10.0</span></div>
+      <div class="hd-title">提醒器 <span class="ver">v1.11.0</span></div>
       <div class="hd-time" id="clock">--:--:--</div>
     </div>
 
@@ -393,7 +393,9 @@ var WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];
 
 /* ---------- 运行时状态 ---------- */
 var data = null;            // { version, settings, jobs:[] }
-var alarms = [];            // 待确认的提醒
+var alarms = [];            // 当前弹层里的那一条（数组，沿用原有的确认 / 稍后逻辑）
+var alarmQueue = [];        // 已到点、还没轮到的提醒，逐条弹出
+var alarmSwitchTimer = null;
 var snoozes = [];           // { at, jobId }
 var alarmOpen = false;
 var editorJob = null;       // null=新建
@@ -774,7 +776,7 @@ function checkMissedOnBoot() {
 
   if (missed.length) {
     missed.sort(function (a, b) { return a.at - b.at; });
-    setTimeout(function () { if (!alarmOpen) fire(missed); }, 600);
+    setTimeout(function () { queueDue(missed); }, 600);
   }
 }
 
@@ -833,8 +835,9 @@ function tick() {
     }
     if (snoozeFired) renderList();
 
-    if (due.length && !alarmOpen) {
-      fire(due, wakeGap, wakeSkipped);
+    if (due.length) {
+      // 到点的提醒全部入队、逐条弹出；弹层开着时也入队，不能丢
+      queueDue(due, wakeGap, wakeSkipped);
     } else if (wakeGap >= WAKE_NOTICE_MS && !alarmOpen) {
       var msg = '页面被挂起约 ' + gapText(wakeGap) + '，已重新校准时间';
       if (wakeSkipped) msg += '；' + wakeSkipped + ' 条提醒超出补提醒窗口，已跳过';
@@ -900,68 +903,117 @@ function onPageWake(source) {
 
 /* =====================================================================
    触发提醒
+   ---------------------------------------------------------------------
+   同一时刻到点的提醒不再合并成一条：全部进队列，一条一条弹、一条一条响。
+   合并显示时第二条只能出现在「同时到期」的小字里，同名时完全看不出来，
+   点一次「我知道了」还会把两条一起清掉。弹层没关时新到点的提醒以前会被
+   直接丢弃（nextAt 已推进），现在同样入队，等当前这条确认后再弹。
    ===================================================================== */
-function fire(dueList, wakeGap, wakeSkipped) {
+function queueDue(dueList, wakeGap, wakeSkipped) {
+  for (var i = 0; i < dueList.length; i++) {
+    var d = dueList[i];
+    d.wakeGap = wakeGap || 0;
+    d.wakeSkipped = i === 0 ? (wakeSkipped || 0) : 0;
+    alarmQueue.push(d);
+  }
+
+  // nextAt 已推进，立刻重画列表，不再显示「下次 今天 20:00」
+  renderList();
+
+  if (alarmOpen) {
+    paintAlarmQueueHint();   // 弹层开着时又到点了，更新「还有 N 条」
+  } else {
+    showAlarmNext();
+  }
+}
+
+/* 弹层底部那句「还有 N 条待确认」 */
+function paintAlarmQueueHint() {
+  var n = alarmQueue.length;
+  $('alarmList').innerHTML = n
+    ? '还有 ' + n + ' 条提醒等你确认，点「我知道了」后自动弹出下一条'
+    : '';
+}
+
+/* 弹出队列里的下一条；队列空了就收起弹层 */
+function showAlarmNext() {
+  if (alarmSwitchTimer) { clearTimeout(alarmSwitchTimer); alarmSwitchTimer = null; }
+
+  if (!alarmQueue.length) {
+    closeAlarmUI();
+    return;
+  }
+
+  var cur = alarmQueue.shift();
+  var job = cur.job;
+
   alarmOpen = true;
-  alarms = dueList;
+  alarms = [cur];
 
-  var first = dueList[0];
-  $('alarmLabel').textContent = first.job.label;
-
-  var timeText = fmtWhen(first.at);
-  $('alarmTime').textContent = '原定 ' + timeText;
+  $('alarmLabel').textContent = job.label;
+  $('alarmTime').textContent = '原定 ' + fmtWhen(cur.at);
 
   var extra = '';
-  if (wakeGap >= WAKE_NOTICE_MS) {
-    extra = '页面被挂起约 ' + gapText(wakeGap) + '，这条提醒在挂起期间到点';
-  } else if (first.onBoot) {
-    extra = '页面刚打开，这条提醒 ' + Math.round(first.late / 60000) + ' 分钟前已到点';
-  } else if (first.late > 60000) {
-    extra = '晚了 ' + Math.round(first.late / 60000) + ' 分钟才提醒你';
+  if (cur.wakeGap >= WAKE_NOTICE_MS) {
+    extra = '页面被挂起约 ' + gapText(cur.wakeGap) + '，这条提醒在挂起期间到点';
+  } else if (cur.onBoot) {
+    extra = '页面刚打开，这条提醒 ' + Math.round(cur.late / 60000) + ' 分钟前已到点';
+  } else if (cur.late > 60000) {
+    extra = '晚了 ' + Math.round(cur.late / 60000) + ' 分钟才提醒你';
   }
 
-  var more = [];
-  for (var i = 1; i < dueList.length; i++) {
-    more.push(dueList[i].job.label + '（' + fmtWhen(dueList[i].at) + '）');
-  }
-  var missedCount = 0;
-  for (var m = 0; m < dueList.length; m++) if (dueList[m].missed > 1) missedCount += dueList[m].missed - 1;
-
-  if (missedCount > 0) extra += (extra ? '，' : '') + '另有 ' + missedCount + ' 次未提醒已跳过';
-  if (wakeSkipped > 0) extra += (extra ? '，' : '') + '另有 ' + wakeSkipped + ' 条超出补提醒窗口，未补提醒';
+  if (cur.missed > 1) extra += (extra ? '，' : '') + '另有 ' + (cur.missed - 1) + ' 次未提醒已跳过';
+  if (cur.wakeSkipped > 0) extra += (extra ? '，' : '') + '另有 ' + cur.wakeSkipped + ' 条超出补提醒窗口，未补提醒';
   $('alarmExtra').textContent = extra;
 
-  if (more.length) {
-    $('alarmList').innerHTML = '同时到期：<br>' + more.map(function (x) { return esc(x); }).join('<br>');
-  } else {
-    $('alarmList').innerHTML = '';
-  }
+  paintAlarmQueueHint();
 
   $('alarmMask').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 
   paintFavicon(true);
-  playAlarm(first.job);
-  notifyDesktop(first.job, extra);
-  startFlash(first.job.label);
+  playAlarm(job);
+  notifyDesktop(job, extra);
+  startFlash(job.label);
 
   // 响了设定时长就自动静音，弹层和标题闪烁保留
   alarmStartedAt = Date.now();
   rearmAutoStop();
 }
 
-function ackAll() {
+/* 收起弹层、停声音，队列保留 */
+function closeAlarmUI() {
   if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
   alarmStartedAt = 0;
+  alarmOpen = false;
+  alarms = [];
   paintFavicon(false);
   stopSound();
   stopFlash();
   $('alarmMask').classList.add('hidden');
   document.body.style.overflow = '';
-  alarmOpen = false;
-  alarms = [];
+}
+
+/* 确认当前这条：队列里还有就隔一小会儿弹下一条 */
+function dismissCurrent() {
+  var more = alarmQueue.length;
+  closeAlarmUI();
   paintNext();
-  saveData();
+
+  if (!more) {
+    saveData();
+    return;
+  }
+
+  // 停一下再弹，避免连点「我知道了」把下一条也点掉
+  alarmSwitchTimer = setTimeout(function () {
+    alarmSwitchTimer = null;
+    showAlarmNext();
+  }, 800);
+}
+
+function ackAll() {
+  dismissCurrent();
 }
 
 function snoozeAll() {
@@ -970,10 +1022,11 @@ function snoozeAll() {
   for (var i = 0; i < alarms.length; i++) {
     snoozes.push({ at: at, jobId: alarms[i].job.id });
   }
-  ackAll();
+  var rest = alarmQueue.length;
+  dismissCurrent();
   renderList();
   paintNext();
-  toast('将在 ' + mins + ' 分钟后再次提醒');
+  toast('将在 ' + mins + ' 分钟后再次提醒' + (rest ? '，还有 ' + rest + ' 条待确认' : ''));
 }
 
 /* =====================================================================
@@ -1602,6 +1655,8 @@ function stepDown() {
   isOwner = false;
   myOwnerTs = 0;
   if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
+  if (alarmSwitchTimer) { clearTimeout(alarmSwitchTimer); alarmSwitchTimer = null; }
+  alarmQueue = [];
   alarmStartedAt = 0;
   stopSound();
   stopFlash();
