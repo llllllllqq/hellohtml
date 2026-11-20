@@ -164,6 +164,13 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
 .alarm-btns{display:flex;}
 .alarm-btns .btn{flex:1;padding:11px 0;}
 .alarm-list{margin:14px 0 20px;font-size:12.5px;color:var(--t2);line-height:1.9;}
+/* 被后来的提醒顶替时闪一下，提醒用户弹层里的内容已经换了 */
+@keyframes takeoverFlash{
+  0%{box-shadow:0 0 0 0 rgba(201,56,56,.55),0 12px 40px rgba(0,0,0,.22);}
+  100%{box-shadow:0 0 0 22px rgba(201,56,56,0),0 12px 40px rgba(0,0,0,.22);}
+}
+.alarm .dialog.takeover{animation:takeoverFlash .8s ease-out 2;}
+@media (prefers-reduced-motion: reduce){.alarm .dialog.takeover{animation:none;}}
 
 /* ---- toast ---- */
 #toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%) translateY(10px);
@@ -193,7 +200,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
   <div class="app">
 
     <div class="hd">
-      <div class="hd-title">提醒器 <span class="ver">v1.11.0</span></div>
+      <div class="hd-title">提醒器 <span class="ver">v1.12.0</span></div>
       <div class="hd-time" id="clock">--:--:--</div>
     </div>
 
@@ -353,7 +360,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
 
 <!-- 提醒弹层 -->
 <div class="mask hidden alarm" id="alarmMask">
-  <div class="dialog">
+  <div class="dialog" id="alarmDlg">
     <div class="alarm-kicker">提 醒</div>
     <div class="alarm-label" id="alarmLabel">—</div>
     <div class="alarm-time" id="alarmTime"></div>
@@ -904,40 +911,64 @@ function onPageWake(source) {
 /* =====================================================================
    触发提醒
    ---------------------------------------------------------------------
-   同一时刻到点的提醒不再合并成一条：全部进队列，一条一条弹、一条一条响。
-   合并显示时第二条只能出现在「同时到期」的小字里，同名时完全看不出来，
-   点一次「我知道了」还会把两条一起清掉。弹层没关时新到点的提醒以前会被
-   直接丢弃（nextAt 已推进），现在同样入队，等当前这条确认后再弹。
+   多条提醒互不阻塞：弹层开着（甚至没人点「我知道了」）时又到点了，
+   新的这条立刻接管弹层和声音——旧声音停掉、内容换成新的、重新响铃，
+   不用先把上一条处理掉。同一次 tick 里同时到点的多条排成一批，
+   每条展示 BATCH_HOLD_MS 后自动切下一条，同样不用等确认。
+   还没轮到展示的旧条目排在新批次后面，不会因为被抢占而丢掉。
    ===================================================================== */
+var BATCH_HOLD_MS = 8000;   // 同一批里每条展示这么久后自动切下一条
+var batchTimer = null;
+
+function clearBatchTimer() {
+  if (batchTimer) { clearTimeout(batchTimer); batchTimer = null; }
+}
+
 function queueDue(dueList, wakeGap, wakeSkipped) {
+  if (!dueList || !dueList.length) return;
+
   for (var i = 0; i < dueList.length; i++) {
     var d = dueList[i];
     d.wakeGap = wakeGap || 0;
     d.wakeSkipped = i === 0 ? (wakeSkipped || 0) : 0;
-    alarmQueue.push(d);
+    if (!d.at) d.at = Date.now();
   }
+  // 同一批里先到点的先弹
+  dueList.sort(function (a, b) { return a.at - b.at; });
+
+  // 弹层里那条还没确认就被顶替：展示时说明一句
+  var replaced = alarmOpen ? 1 : 0;
+
+  // 还没轮到展示的旧条目不能丢，排到新批次后面继续弹
+  var carry = alarmQueue;
+
+  if (alarmSwitchTimer) { clearTimeout(alarmSwitchTimer); alarmSwitchTimer = null; }
+  clearBatchTimer();
+
+  alarmQueue = [];
+  for (var k = 0; k < dueList.length; k++) alarmQueue.push(dueList[k]);
+  for (var c = 0; c < carry.length; c++) alarmQueue.push(carry[c]);
 
   // nextAt 已推进，立刻重画列表，不再显示「下次 今天 20:00」
   renderList();
 
-  if (alarmOpen) {
-    paintAlarmQueueHint();   // 弹层开着时又到点了，更新「还有 N 条」
-  } else {
-    showAlarmNext();
-  }
+  // 新提醒一律抢占：上一条直接让位，立刻弹新的一批
+  showAlarmNext(replaced);
 }
 
-/* 弹层底部那句「还有 N 条待确认」 */
+/* 弹层底部那句「本批还有 N 条」 */
 function paintAlarmQueueHint() {
   var n = alarmQueue.length;
   $('alarmList').innerHTML = n
-    ? '还有 ' + n + ' 条提醒等你确认，点「我知道了」后自动弹出下一条'
+    ? '还有 ' + n + ' 条待展示，' + Math.round(BATCH_HOLD_MS / 1000) +
+      ' 秒后自动切换；点「我知道了」立即看下一条'
     : '';
 }
 
-/* 弹出队列里的下一条；队列空了就收起弹层 */
-function showAlarmNext() {
+/* 展示队列里的下一条；队列空了就收起弹层 */
+function showAlarmNext(replaced) {
   if (alarmSwitchTimer) { clearTimeout(alarmSwitchTimer); alarmSwitchTimer = null; }
+  clearBatchTimer();
 
   if (!alarmQueue.length) {
     closeAlarmUI();
@@ -964,6 +995,7 @@ function showAlarmNext() {
 
   if (cur.missed > 1) extra += (extra ? '，' : '') + '另有 ' + (cur.missed - 1) + ' 次未提醒已跳过';
   if (cur.wakeSkipped > 0) extra += (extra ? '，' : '') + '另有 ' + cur.wakeSkipped + ' 条超出补提醒窗口，未补提醒';
+  if (replaced > 0) extra += (extra ? '；' : '') + '上一条提醒还没确认，已被这条顶替';
   $('alarmExtra').textContent = extra;
 
   paintAlarmQueueHint();
@@ -971,18 +1003,38 @@ function showAlarmNext() {
   $('alarmMask').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 
+  // 顶替时让弹层闪一下，避免用户没注意到内容已经换了
+  var dlg = $('alarmDlg');
+  if (dlg) {
+    dlg.className = 'dialog';
+    if (replaced > 0) {
+      void dlg.offsetWidth;          // 强制回流，让动画重新播放
+      dlg.className = 'dialog takeover';
+    }
+  }
+
   paintFavicon(true);
-  playAlarm(job);
+  playAlarm(job);                    // 内部先停掉旧声音，再放新的
   notifyDesktop(job, extra);
   startFlash(job.label);
 
   // 响了设定时长就自动静音，弹层和标题闪烁保留
   alarmStartedAt = Date.now();
   rearmAutoStop();
+
+  // 同一批还有下一条：展示一会儿自动切过去，不用等确认
+  if (alarmQueue.length) {
+    batchTimer = setTimeout(function () {
+      batchTimer = null;
+      if (!alarmOpen) return;
+      showAlarmNext(0);
+    }, BATCH_HOLD_MS);
+  }
 }
 
-/* 收起弹层、停声音，队列保留 */
+/* 收起弹层、停声音；队列由调用方决定是否清空 */
 function closeAlarmUI() {
+  clearBatchTimer();
   if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
   alarmStartedAt = 0;
   alarmOpen = false;
@@ -994,8 +1046,11 @@ function closeAlarmUI() {
   document.body.style.overflow = '';
 }
 
-/* 确认当前这条：队列里还有就隔一小会儿弹下一条 */
+/* 确认当前这条：本批还有就接着弹下一条 */
 function dismissCurrent() {
+  if (alarmSwitchTimer) { clearTimeout(alarmSwitchTimer); alarmSwitchTimer = null; }
+  clearBatchTimer();
+
   var more = alarmQueue.length;
   closeAlarmUI();
   paintNext();
@@ -1008,8 +1063,8 @@ function dismissCurrent() {
   // 停一下再弹，避免连点「我知道了」把下一条也点掉
   alarmSwitchTimer = setTimeout(function () {
     alarmSwitchTimer = null;
-    showAlarmNext();
-  }, 800);
+    showAlarmNext(0);
+  }, 600);
 }
 
 function ackAll() {
@@ -1026,7 +1081,7 @@ function snoozeAll() {
   dismissCurrent();
   renderList();
   paintNext();
-  toast('将在 ' + mins + ' 分钟后再次提醒' + (rest ? '，还有 ' + rest + ' 条待确认' : ''));
+  toast('将在 ' + mins + ' 分钟后再次提醒' + (rest ? '；还有 ' + rest + ' 条待展示，会接着弹出' : ''));
 }
 
 /* =====================================================================
@@ -1656,6 +1711,7 @@ function stepDown() {
   myOwnerTs = 0;
   if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
   if (alarmSwitchTimer) { clearTimeout(alarmSwitchTimer); alarmSwitchTimer = null; }
+  clearBatchTimer();
   alarmQueue = [];
   alarmStartedAt = 0;
   stopSound();

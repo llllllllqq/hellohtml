@@ -2,7 +2,7 @@
 
 本文件写给在本仓库工作的 AI 代理（也适用于人类贡献者），记录这个项目**怎么做、为什么这样做、哪里容易踩坑**。产品介绍、用法和功能细节在根 [README.md](README.md) 与各子项目的 README 里，这里不重复。
 
-当前基线：**v1.11.0**，10 个子项目、12 个 HTML 页面。数字会随项目变化，下面这些规则不变。
+当前基线：**v1.12.0**，10 个子项目、12 个 HTML 页面。数字会随项目变化，下面这些规则不变。
 
 动手前建议按顺序读：
 
@@ -35,11 +35,11 @@
 | 目的 | 命令 |
 | --- | --- |
 | 检查所有页面版本号是否一致 | `npm run version:check` |
-| 把所有页面统一升到新版本 | `npm run version:set -- 1.11.0` |
+| 把所有页面统一升到新版本 | `npm run version:set -- 1.12.0` |
 | 看最近的 CI / Release 运行 | `gh run list --repo llllllllqq/hellohtml --limit 5` |
 | 看某次运行的结果 | `gh run view <run-id> --repo llllllllqq/hellohtml` |
 | 只看失败日志 | `gh run view <run-id> --repo llllllllqq/hellohtml --log-failed` |
-| 看某个 Release 的附件 | `gh release view v1.11.0 --repo llllllllqq/hellohtml --json assets` |
+| 看某个 Release 的附件 | `gh release view v1.12.0 --repo llllllllqq/hellohtml --json assets` |
 | 本地单跑一个 spec（仅当已装好浏览器） | `npx playwright test tests/xxx.spec.js --project=desktop-chromium` |
 
 这个仓库的日常验证放在云端；本机没装浏览器时，不要为了“验证一下”去 `npm ci` + `npx playwright install` 跑全量，直接推分支让 CI 跑，成本更低也更接近最终环境。
@@ -84,7 +84,7 @@
 ### 4.2 套页面规范
 
 - 补 `lang="zh-CN"`、`<meta charset>`、viewport、`color-scheme`。
-- 在页面可见标题里加**恰好一个**版本标记：`<span class="ver">v1.11.0</span>`。
+- 在页面可见标题里加**恰好一个**版本标记：`<span class="ver">v1.12.0</span>`。
 - `<title>` 只写功能名，不带版本号。
 - 详细清单见第 5 节。
 
@@ -110,13 +110,13 @@
 - “项目结构”表格加一行 `[子项目](子项目/)`
 - 正文里的子项目数量（当前“十个子项目”）和页面数量（当前“十二个页面”）
 - “测试覆盖”列表加上新子项目
-- 版本示例（`git tag v1.11.0`、`npm run version:set -- 1.11.0`）按当前版本更新
+- 版本示例（`git tag v1.12.0`、`npm run version:set -- 1.12.0`）按当前版本更新
 - 如果新增了测试文件，补一条覆盖说明
 
 ### 4.6 统一版本并验证
 
 ```bash
-npm run version:set -- 1.11.0
+npm run version:set -- 1.12.0
 npm run version:check
 ```
 
@@ -141,7 +141,7 @@ npm run version:check
 <style>/* 全部内联 */</style>
 </head>
 <body>
-  <h1>功能名 <span class="ver">v1.11.0</span></h1>
+  <h1>功能名 <span class="ver">v1.12.0</span></h1>
   <!-- 页面内容 -->
 <script>/* 全部内联 */</script>
 </body>
@@ -157,7 +157,7 @@ npm run version:check
 - 每页**有且只有一个** `class="ver"` 的元素，内容是 `vX.Y.Z`。
 - 位置在页面可见的标题区域（`h1` 里或页面标题容器里），不要只写在注释或 `<title>` 里。
 - 不要用 `id="ver"`、`data-version` 等其它写法，`scripts/versions.js` 只认 `class="ver">vX.Y.Z<`。
-- 测试里断言版本号用正则 `/^v\d+\.\d+\.\d+$/`，**不要写死 `v1.11.0`**，否则下次统一升版会误报。
+- 测试里断言版本号用正则 `/^v\d+\.\d+\.\d+$/`，**不要写死 `v1.12.0`**，否则下次统一升版会误报。
 
 ### 5.3 离线与 `file://`
 
@@ -230,7 +230,7 @@ npm run version:check
 - 统一升版只用脚本，不要手改十二个文件：
 
 ```bash
-npm run version:set -- 1.11.0
+npm run version:set -- 1.12.0
 npm run version:check
 git diff --stat   # 首次升版应看到全部 12 个页面都变了；已是目标版本的页面不变属正常
 ```
@@ -307,7 +307,7 @@ test.describe('音频发生器', () => {
 ### 7.5 运行与判读
 
 - CI 固定跑三个 project：`desktop-chromium`、`mobile-chrome`、`mobile-safari`；移动端会跳过桌面专属用例，所以有大量 skipped 是正常的。
-- v1.11.0 的基线是 **312 passed / 192 skipped / 0 failed**；数字会随用例增减变化，汇报时以本次 CI 为准。
+- v1.12.0 的基线是 **312 passed / 192 skipped / 0 failed**；数字会随用例增减变化，汇报时以本次 CI 为准。
 - 失败时先看 `gh run view <id> --log-failed`；需要细节再下载 `playwright-report` artifact，看 trace / screenshot。
 - 不要为了让测试变绿而放宽断言、加无理由的 `waitForTimeout` 或把真实 bug 标成 skip；如果只是环境差异，写清楚原因。
 - 修 bug 时先加一条能复现的回归用例，再修；用例名写清症状（例如“另一个标签页接管后，原页面不再响铃”）。
@@ -363,7 +363,7 @@ test.describe('音频发生器', () => {
 ```bash
 # 1. 改代码 + 测试 + README
 # 2. 所有页面统一升版
-npm run version:set -- 1.11.0
+npm run version:set -- 1.12.0
 npm run version:check
 
 # 3. 在 CHANGELOG.md 顶部补本次版本记录
@@ -372,12 +372,12 @@ npm run version:check
 # 4. 提交并推 main
 git status --short
 git add -A
-git commit -m "Add <功能>; bump to v1.11.0"
+git commit -m "Add <功能>; bump to v1.12.0"
 git push origin main
 
 # 5. 等 main 的 CI 绿（见第 2 节命令），再打标签
-git tag v1.11.0
-git push origin v1.11.0
+git tag v1.12.0
+git push origin v1.12.0
 ```
 
 - 从 v1.6.0 起，**每次发版都必须更新 CHANGELOG.md**：在顶部新增 `## [x.y.z] - YYYY-MM-DD`，列出新增、变更、修复和测试结果；只改代码不改日志视为未完成。
@@ -414,7 +414,7 @@ CI：X passed / Y skipped，三种环境全绿。
 Release 已创建时用：
 
 ```bash
-gh release edit v1.11.0 --repo llllllllqq/hellohtml --notes-file notes.md
+gh release edit v1.12.0 --repo llllllllqq/hellohtml --notes-file notes.md
 ```
 
 ### 9.4 发布后验收
@@ -432,7 +432,7 @@ gh release edit v1.11.0 --repo llllllllqq/hellohtml --notes-file notes.md
 - **击鼓传花 / 文字颜色 / 生日老虎机**：纯游戏，测试覆盖初始状态和主流程，重点是小屏不溢出、按钮可点。不要为了“统一风格”改它们的配色和动效。
 - **身份证拼接器**：Canvas 拼版 + JPG/PDF 下载；测试用 1×1 PNG 走完整上传/下载，校验文件名和 PDF 头。图片预览/下载的 object URL 要回收。
 - **音视频剪切器（2 页）**：纯前端容器级无损剪切。测试不依赖 ffmpeg：夹具已提交，结构用独立解析器校验，内容用 WebAudio 解码后做相关性比对。大文件、长文件、损坏容器都要有错误分支。
-- **提醒器**：IndexedDB 优先、localStorage 降级；假时钟测试规则推算、到点弹层、稍后再说、补提醒、多标签页接管；睡眠/冻结用 `freeze`/`resume` + `visibilitychange` + 定时器间隔兜底。涉及 `window.confirm`、音频手势、标签页所有权，改动后务必跑回归。到点提醒走队列（`alarmQueue`）：同一时刻到点的多条、以及弹层开着时新到点的，都逐条弹出、逐条确认，`alarms` 只保存当前那一条供「稍后再说」使用，队列空了才落库；改这块要注意 `stepDown` 会清空队列。
+- **提醒器**：IndexedDB 优先、localStorage 降级；假时钟测试规则推算、到点弹层、稍后再说、补提醒、多标签页接管；睡眠/冻结用 `freeze`/`resume` + `visibilitychange` + 定时器间隔兜底。涉及 `window.confirm`、音频手势、标签页所有权，改动后务必跑回归。到点提醒走队列（`alarmQueue`）：弹层开着时新到点的提醒直接抢占（停旧声音、重置闪烁、弹层闪一下、标注「已被这条顶替」），同一批同时到点的每条展示 8 秒（`BATCH_HOLD_MS`）后自动切下一条，还没展示过的旧条目排在新批次后面；`alarms` 只保存当前那一条供「稍后再说」使用，队列空了才落库；`stepDown` 会清空队列和 `alarmSwitchTimer` / `batchTimer`。
 - **音频发生器**：全部由 Web Audio 实时合成，不加载音频文件；播放必须用户手势；切波形会重建音源，切噪声用 BufferSource；高频/超过 Nyquist 要有提示；示波器用 canvas，后台标签页会降频。
 - **文本编辑器**：编码识别和保存依赖 `TextDecoder` / `TextEncoder`；保存是 Blob 下载，不是写回原文件；未保存修改用 `confirm`；`?selftest` 会跑编码往返、BOM 和换行自检。测试覆盖 UTF-8 BOM、GBK + CRLF 的下载字节、查找替换和偏好持久化。
 - **文本对比器**：打开文件时按 BOM / 严格 UTF-8 校验 / 字符分布推断编码（UTF-8、UTF-16、GBK、Big5、Shift_JIS、Win-1252），每栏的编码下拉可手动重读原始字节；行级 diff，末尾换行和 CRLF/LF 差异不参与比较，三种换行混排都能正常分行；超大差异会退化为整段删除 + 新增。顶栏「Aa 行内对比」开关对成对修改的行做字符级高亮：先裁公共前后缀，中间用 Myers（上限受控），失败后改用线性空间的 Hirschberg 补齐；单行最多比较 400 万对字符、一次渲染 800 万对，超出就保留整行高亮，避免超长行卡死页面。测试覆盖增删统计、仅差异视图、间隙折叠、布局、编码切换、文件读取、行内开关与长行降级。

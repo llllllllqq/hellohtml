@@ -291,7 +291,7 @@ test.describe('提醒器', () => {
     await expect(page.locator('#nextLine')).toContainText('明天 09:00');
   });
 
-  test('同一时刻到点两条提醒：逐条弹出，不会一起被清掉', async ({ page, isMobile }) => {
+  test('同一时刻到点两条提醒：一条一条响，8 秒自动切下一条', async ({ page, isMobile }) => {
     test.skip(isMobile, '只在桌面端跑');
     await installClock(page, '2026-03-10T08:59:30+08:00');
     await openPage(page);
@@ -300,27 +300,51 @@ test.describe('提醒器', () => {
     await addJob(page, { label: '吃降压药' });
     await addJob(page, { label: '喝水' });
 
-    await page.clock.runFor(45_000);
-
+    // 09:00:01：第一条正在弹，提示本批还有一条
+    await page.clock.runFor(31_000);
     await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
     await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
-    await expect(page.locator('#alarmList')).toContainText('还有 1 条提醒等你确认');
+    await expect(page.locator('#alarmList')).toContainText('还有 1 条待展示');
 
-    await page.locator('#btnAck').click();
-    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
-    // 隔 800ms 再弹下一条，避免连点把下一条一起点掉
-    await page.clock.runFor(1_000);
-
-    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    // 没人点确认，8 秒后自动切到下一条
+    await page.clock.runFor(8_500);
     await expect(page.locator('#alarmLabel')).toHaveText('喝水');
     await expect(page.locator('#alarmList')).toHaveText('');
+
+    // 不会循环切回第一条
+    await page.clock.runFor(20_000);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
 
     await page.locator('#btnAck').click();
     await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
     await expect(page.locator('#nextLine')).toContainText('明天');
   });
 
-  test('弹层没关时新到点的提醒会排队，不会被丢掉', async ({ page, isMobile }) => {
+  test('同一时刻到点两条提醒：点「我知道了」立即看下一条', async ({ page, isMobile }) => {
+    test.skip(isMobile, '只在桌面端跑');
+    await installClock(page, '2026-03-10T08:59:30+08:00');
+    await openPage(page);
+    await page.locator('#statusBar').click();
+
+    await addJob(page, { label: '吃降压药' });
+    await addJob(page, { label: '喝水' });
+
+    await page.clock.runFor(31_000);
+    await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
+
+    await page.locator('#btnAck').click();
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+    await page.clock.runFor(1_000);
+
+    await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#alarmLabel')).toHaveText('喝水');
+
+    await page.locator('#btnAck').click();
+    await expect(page.locator('#alarmMask')).toHaveClass(/hidden/);
+    await expect(page.locator('#nextLine')).toContainText('明天');
+  });
+
+  test('弹层没关时新到点的提醒会立刻接管，不用先确认上一条', async ({ page, isMobile }) => {
     test.skip(isMobile, '只在桌面端跑');
     await installClock(page, '2026-03-10T08:59:30+08:00');
     await openPage(page);
@@ -329,18 +353,20 @@ test.describe('提醒器', () => {
     await addJob(page, { label: '吃降压药' });
     await addJob(page, { label: '喝水', time: '09:01' });
 
-    await page.clock.runFor(45_000);
+    await page.clock.runFor(31_000);
     await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
 
-    // 弹层一直开着，等到第二条到点
-    await page.clock.runFor(65_000);
-    await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
-    await expect(page.locator('#alarmList')).toContainText('还有 1 条提醒等你确认');
-
-    await page.locator('#btnAck').click();
-    await page.clock.runFor(1_000);
+    // 上一条不确认，等到 09:01 的第二条到点
+    await page.clock.runFor(60_000);
     await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
     await expect(page.locator('#alarmLabel')).toHaveText('喝水');
+    await expect(page.locator('#alarmExtra')).toContainText('上一条提醒还没确认，已被这条顶替');
+    await expect(page.locator('#alarmDlg')).toHaveClass(/takeover/);
+
+    // 被顶替的那条仍然在列表里，明天照常提醒
+    await page.locator('#btnAck').click();
+    await expect(page.locator('#list')).toContainText('吃降压药');
+    await expect(page.locator('#list')).toContainText('喝水');
   });
 
   test('稍后再说只作用于当前这条，队列里的下一条照常弹出', async ({ page, isMobile }) => {
@@ -352,16 +378,18 @@ test.describe('提醒器', () => {
     await addJob(page, { label: '吃降压药' });
     await addJob(page, { label: '喝水' });
 
-    await page.clock.runFor(45_000);
+    await page.clock.runFor(31_000);
+    await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
     await page.locator('#btnSnooze').click();
 
-    await expect(page.locator('#toast')).toContainText('还有 1 条待确认');
+    await expect(page.locator('#toast')).toContainText('还有 1 条待展示');
     await expect(page.locator('.snooze-tag')).toHaveText('稍后 09:05');
 
     await page.clock.runFor(1_000);
     await expect(page.locator('#alarmMask')).not.toHaveClass(/hidden/);
     await expect(page.locator('#alarmLabel')).toHaveText('喝水');
   });
+
 
   test('稍后再说：5 分钟后再次提醒', async ({ page, isMobile }) => {
     test.skip(isMobile, '只在桌面端跑');
@@ -453,7 +481,7 @@ test.describe('提醒器', () => {
     await page.clock.runFor(1_000);
 
     await expect(page.locator('#alarmLabel')).toHaveText('吃降压药');
-    await expect(page.locator('#alarmList')).toContainText('还有 1 条提醒等你确认');
+    await expect(page.locator('#alarmList')).toContainText('还有 1 条待展示');
 
     await page.locator('#btnAck').click();
     await page.clock.runFor(1_000);
