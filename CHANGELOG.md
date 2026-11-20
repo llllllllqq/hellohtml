@@ -20,7 +20,7 @@
 ### 测试
 
 - 提醒器用例更新与新增：同批两条 8 秒自动切换且不循环、点「我知道了」立即看下一条、弹层没关时新提醒立刻接管并标注「已被这条顶替」、稍后再说只作用于当前这条、补提醒时多条逐条弹
-- CI：**X passed / Y skipped / 0 failed**，桌面 Chrome、Pixel 5、iPhone 13 全绿
+- CI：**313 passed / 194 skipped / 0 failed**，桌面 Chrome、Pixel 5、iPhone 13 全绿
 
 ## [1.11.0] - 2026-11-19
 

@@ -307,7 +307,7 @@ test.describe('音频发生器', () => {
 ### 7.5 运行与判读
 
 - CI 固定跑三个 project：`desktop-chromium`、`mobile-chrome`、`mobile-safari`；移动端会跳过桌面专属用例，所以有大量 skipped 是正常的。
-- v1.12.0 的基线是 **312 passed / 192 skipped / 0 failed**；数字会随用例增减变化，汇报时以本次 CI 为准。
+- v1.12.0 的基线是 **313 passed / 194 skipped / 0 failed**；数字会随用例增减变化，汇报时以本次 CI 为准。
 - 失败时先看 `gh run view <id> --log-failed`；需要细节再下载 `playwright-report` artifact，看 trace / screenshot。
 - 不要为了让测试变绿而放宽断言、加无理由的 `waitForTimeout` 或把真实 bug 标成 skip；如果只是环境差异，写清楚原因。
 - 修 bug 时先加一条能复现的回归用例，再修；用例名写清症状（例如“另一个标签页接管后，原页面不再响铃”）。
